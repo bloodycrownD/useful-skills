@@ -212,7 +212,7 @@ Output:
 
 ## 备注
 
-- 文档输入/输出仅使用 `prd.md` 与 `spec.md`
+- 文档输入/输出仅使用 `prd.md` 与 `spec.md`，默认位于 `.apm/kb/docs/Iterations/<需求名称>/`
 - spec 是唯一事实来源；若实现要偏离，先更新 spec 再实施
 - 每轮优先小而可回滚的提交
 - inline-loop 产出的实现代码默认应具备可读注释；若评审指出“可维护性差/难理解”，视为 must-fix

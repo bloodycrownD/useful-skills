@@ -8,14 +8,15 @@ disable-model-invocation: true
 
 ## 使用说明
 
-1. 先读取需求文档：
-   - `docs/Iterations/<需求名称>/prd.md`
+1. 先读取需求文档（APM 知识库）：
+   - `.apm/kb/docs/Iterations/<需求名称>/prd.md`
 2. **在生成 `spec.md` 之前，必须先探索相关项目代码**（不可跳过）：
    - 基于 `prd.md` 列出可能涉及的文件、模块、接口
    - 阅读关键文件并确认当前实现与约束
    - 明确影响范围、兼容性风险、技术边界
-3. 完成代码探索后，再生成方案文档：
-   - `docs/Iterations/<需求名称>/spec.md`
+3. 完成代码探索后，再生成方案文档并写入知识库：
+   - `.apm/kb/docs/Iterations/<需求名称>/spec.md`
+   - 写完后执行 `apm kb index rebuild`
 4. `spec.md` 必须基于真实代码上下文，不允许只依据需求文本做“空中方案”。
 5. SPEC 必须面向实现，至少包含：
    - 总体实现思路与架构
@@ -31,10 +32,10 @@ disable-model-invocation: true
 
 ## 执行检查清单（每次都要走完）
 
-- [ ] 已读取 `docs/Iterations/<需求名称>/prd.md`
+- [ ] 已读取 `.apm/kb/docs/Iterations/<需求名称>/prd.md`
 - [ ] 已完成相关代码探索（文件/模块/接口）
 - [ ] 已在方案中体现现状约束与影响分析
-- [ ] 已生成 `docs/Iterations/<需求名称>/spec.md`
+- [ ] 已生成 `.apm/kb/docs/Iterations/<需求名称>/spec.md` 并已 `apm kb index rebuild`
 - [ ] 已请求用户确认 `spec.md` 后再进入编码
 
 ## 文档模板

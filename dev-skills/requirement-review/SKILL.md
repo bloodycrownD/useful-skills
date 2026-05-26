@@ -15,8 +15,10 @@ disable-model-invocation: true
    - 范围（包含 / 不包含）
    - 成功指标（可量化）
    - 验收标准
-3. 澄清完成后，生成 PRD 文档：
-   - `docs/Iterations/<需求名称>/prd.md`
+3. 澄清完成后，生成 PRD 并写入 APM 知识库：
+   - `.apm/kb/docs/Iterations/<需求名称>/prd.md`
+   - 可用 `apm kb write --path Iterations/<需求名称>/prd.md --text "…"`，或直接写文件
+   - 写完后执行 `apm kb index rebuild`（便于 `apm read` 联想检索）
 4. 默认输出轻量 PRD，`prd.md` 至少包含以下内容：
    - 背景
    - 目标（含成功指标）

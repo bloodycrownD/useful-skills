@@ -14,8 +14,9 @@ disable-model-invocation: true
    - 与原始范围相比发生了什么变化
    - 影响的模块与接口
    - 更新后的验收标准
-3. **必须生成变更级需求文档 `prd.md`**：
-   - `docs/Iterations/<需求名称>/features/<变更名称>/prd.md`
+3. **必须生成变更级需求文档 `prd.md`**（APM 知识库）：
+   - `.apm/kb/docs/Iterations/<需求名称>/features/<变更名称>/prd.md`
+   - 写完后执行 `apm kb index rebuild`
 4. 本技能在当前流程中仅覆盖 `prd.md` 的产出与确认。
 5. 若用户提出技术方案需求，可提示使用 `design-proposal` 生成 `spec.md`。
 6. 完成 `prd.md` 后，**必须请求用户确认该文档**，然后结束本技能流程。
@@ -33,7 +34,7 @@ disable-model-invocation: true
 
 ## 必要产物
 
-- `docs/Iterations/<需求名称>/features/<变更名称>/prd.md`
+- `.apm/kb/docs/Iterations/<需求名称>/features/<变更名称>/prd.md`
 
 ## 文档模板
 
