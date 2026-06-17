@@ -35,7 +35,7 @@ disable-model-invocation: true
 
 ## 阶段记忆更新
 
-每阶段结束后执行（`apm dynamic write --text "…"`；`apm persist write --text "…"` 或 `replace` 更新过时条目）：
+每阶段结束后执行（多行正文用 `apm dynamic write --stdin`；`apm persist write --stdin` 或 `replace` 更新过时条目；短句可用 `--text`）：
 
 | 阶段 | dynamic（当前任务） | persist（跨会话结论） |
 |------|---------------------|---------------------|
