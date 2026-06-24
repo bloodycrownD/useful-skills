@@ -38,7 +38,7 @@ disable-model-invocation: true
 
 ## 阶段记忆更新
 
-每阶段结束后执行（多行正文用 `apm dynamic write --stdin`；`apm persist write --stdin` 或 `replace` 更新过时条目；短句可用 `--text`）：
+每阶段结束后执行（多行正文用 heredoc 管道：`cat <<'EOF' | apm dynamic write --stdin`；persist 同理；`replace` 更新过时条目；短句可用 `--text`）：
 
 | 阶段 | dynamic（当前任务） | persist（跨会话结论） |
 |------|---------------------|---------------------|

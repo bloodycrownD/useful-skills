@@ -25,7 +25,7 @@ disable-model-invocation: true
    - **阶段完成**：更新 `dynamic`（已澄清项、待确认项、下一步）与 `persist`（用户已确认的关键决策）
 3. 澄清完成后，生成 PRD 并写入 APM 知识库：
    - `.apm/kb/docs/Iterations/<需求名称>/prd.md`
-   - 可用 `apm kb write --path Iterations/<需求名称>/prd.md --stdin`（多行推荐），或直接写文件
+   - 多行可用 heredoc：`cat <<'EOF' | apm kb write --path Iterations/<需求名称>/prd.md --stdin`（见 `apm-usage`），或直接写文件
    - 写完后执行 `apm kb index rebuild`（便于 `apm read` 联想检索）
    - **阶段完成**：更新 `dynamic`（PRD 路径、状态「待用户确认」或「已完成」）与 `persist`（需求名称、PRD 路径、核心范围与验收要点）
 4. `prd.md` 须符合「文档格式规范」（YAML Front Matter + 正文），默认输出轻量 PRD，正文至少包含：
@@ -60,7 +60,7 @@ disable-model-invocation: true
 
 ## 阶段记忆更新
 
-每阶段结束后执行（多行正文用 `apm dynamic write --stdin`；`apm persist write --stdin` 或 `replace` 更新过时条目；短句可用 `--text`）：
+每阶段结束后执行（多行正文用 heredoc 管道：`cat <<'EOF' | apm dynamic write --stdin`；persist 同理；`replace` 更新过时条目；短句可用 `--text`）：
 
 | 阶段 | dynamic（当前任务） | persist（跨会话结论） |
 |------|---------------------|---------------------|

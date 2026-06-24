@@ -35,8 +35,8 @@ disable-model-invocation: true
    - 本 skill **不**默认写 PRD、SPEC、任务拆分；用户要正式文档时，引导使用 `requirement-review` 或 `design-proposal`
    - 用户只要快速答疑时，直接在对话中回复即可
 5. **可选记忆**（项目已用 APM 且结论值得跨会话复用时）：
-   - `apm dynamic write --stdin`（多行推荐）：本次问题、探索范围、当前结论
-   - `apm persist write --stdin` 或 `replace`：已确认的可复用结论（如「模块 X 不支持 Y，应走 Z」）
+   - 多行用 heredoc：`cat <<'EOF' | apm dynamic write --stdin`（本次问题、探索范围、当前结论）
+   - persist 同理，或 `replace`：已确认的可复用结论（如「模块 X 不支持 Y，应走 Z」）
 
 ## 探索指引
 
