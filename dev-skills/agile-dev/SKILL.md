@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 在**已有迭代**（`Iterations/<需求名称>/`）内做轻量、快速的代码交付：先摸清上下文，再派子代理改代码，**代码完成并验证通过后**在 `bugs/` 或 `features/` 下补充 `prd.md` 与 `spec.md` 留痕。
 
-与 `prd-generate` → `spec-generate` → `code-dev-loop` 的正式流水线互补：本 skill **先实现、后文档**，适合小步快跑；大需求仍走正式流程。
+与 `prd-generate` → `spec-generate` → `code-dev-loop` 的正式流水线互补：本 skill **先实现、后文档**，适合小步快跑；**有 execute-ready spec 的正式交付**仍走 `code-dev-loop`（默认 strict，子代理为主）。
 
 主代理负责编排；**探索与实现类工作须派子代理完成**，主代理不得跳过子代理自行深入读代码或改代码（资源故障见「失败处理」）。
 

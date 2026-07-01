@@ -16,11 +16,11 @@ disable-model-invocation: true
 | **阶段 CR** | `code-dev-loop` 某 phase 完成后 | `stage` |
 | **合并前 CR** | 全部实现与收尾完成后 | `final` |
 
-**执行方式**（均可）：
+**执行方式**：
 
-- **主代理直接执行**：读取 diff / 文件，按本 skill 输出报告（独立 CR 时常见）
-- **派遣 readonly 子代理**：`code-dev-loop` 编排时推荐，避免实现者与评审者同一上下文
-- **用户指定只读**：默认 **不改代码**；用户明确说「review 并修」时方可进入修复
+- **独立 CR**：主代理或子代理均可，读取 diff 后按本 skill 输出报告
+- **`code-dev-loop` pipeline 内**：`cr-stage` / `cr-final` **必须**由 **readonly 评审子代理**执行（实现者不得自审，compact 模式下 impl 是主代理时亦然）
+- 默认 **不改代码**；用户明确「review 并修」时方可修复
 
 评审说明与报告**一律使用中文**（路径、符号、命令等除外）。
 
@@ -265,9 +265,9 @@ HEAD_SHA：<SHA>
 
 ## 与 code-dev-loop 的关系
 
-- `code-dev-loop` 的 `cr-stage` / `cr-final` 节点**应**遵循本 skill（推荐 readonly 子代理，避免自审）
-- 独立 CR **不依赖** DAG；用户确认「通过」后可自行合并或进入下游流程
-- 本 skill 定义**评什么、怎么判**；`code-dev-loop` 定义**何时评、怎么循环修复**
+- `cr-stage` / `cr-final`：**强制** readonly 评审子代理 + 本 skill（主代理不可替代）
+- 独立 CR（`diff` / `explore`）：不依赖 DAG，主代理可直接评审
+- 本 skill 定义**评什么、怎么判**；`code-dev-loop` 定义**何时评、mode、Context Bundle、循环修复**
 
 ---
 

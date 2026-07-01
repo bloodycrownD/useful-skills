@@ -62,7 +62,7 @@ disable-model-invocation: true
    - 本 skill **不**默认写 PRD、SPEC、任务拆分、不改代码
    - 用户要正式需求或技术文档 → 引导 `prd-generate` / `spec-generate`
    - 用户要迭代内快速改代码（修 bug、小功能）→ 引导 `agile-dev`
-   - 用户要按 spec 实现 → 引导 `spec-generate` → `spec-check-loop` → `code-dev-loop`
+   - 用户要按 spec 正式实现 → 引导 `spec-generate` → `spec-check-loop` → `code-dev-loop`（默认 strict，子代理执行；强耦合小 diff 见 compact 例外）
 5. **可选记忆**（项目已用 APM 且结论值得跨会话复用时）：
    - `dynamic`：本次问题、探索范围、当前结论摘要
    - `persist`：可长期复用的结论（如「模块 X 的入口在 …，不负责 Y」）
