@@ -220,7 +220,7 @@ P0 定义：矛盾、缺失 API/验收、与现有代码冲突、实施必打架
 
 ## 与 code-dev-loop 的衔接
 
-execute-ready 且用户确认后，将 **同一份 SPEC 路径** 与 **Context Bundle 素材**（spec 摘要、已拍板决策）交给 `code-dev-loop`（默认 **strict** mode）：
+execute-ready 且用户确认后，将 **同一份 SPEC 路径**、**`spec_confirmed: yes`** 与 **Context Bundle 素材**（spec 摘要、探索报告要点、Step blocking 标注）交给 `code-dev-loop`（默认 **strict**；上游探索 **不**豁免 impl 子代理）：
 
 ```text
 Spec：<SPEC_PATH>

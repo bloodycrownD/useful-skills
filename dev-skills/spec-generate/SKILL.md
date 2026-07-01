@@ -32,8 +32,13 @@ disable-model-invocation: true
    - 测试策略与测试用例
    - 风险与回滚方案
 6. 保证可执行性：每一步都应可落实、可验证。
-7. 编码前先请求用户确认 `spec.md`；**用户确认后**：更新 `dynamic`（状态「spec 已确认，可进入实现」）与 `persist`（已确认的方案要点）。
-8. 明确边界：不再单独生成 `plan.md`，计划内容并入 `spec.md`。
+7. **详细实现步骤**须逐步标注（供 `code-dev-loop` 读）：
+   - 格式：`Step N — phase-<id> — blocking: yes|no — qa: auto|manual_user`
+   - `blocking: yes`：未实现则不得 merge-ready
+   - `qa: manual_user`：真机/录屏等，**不阻塞** merge-ready，合并后由用户验收
+8. 编码前先请求用户确认 `spec.md`；**用户确认后**：更新 `dynamic`（`spec_confirmed: yes`、状态「可进入 code-dev-loop」）与 `persist`（已确认的方案要点）。
+9. 明确边界：不再单独生成 `plan.md`，计划内容并入 `spec.md`。
+10. **交接 `code-dev-loop` 时**：探索报告路径/摘要写入 persist；**探索不构成 impl 豁免**——实现仍走 strict 子代理（或 compact 须单独声明）。
 
 ## 探索阶段（生成 spec 之前必做）
 
@@ -99,7 +104,7 @@ PRD 路径：<PRD_PATH>
 | PRD 读取 | 需求名称、PRD 路径、设计任务状态 | PRD 路径 |
 | 探索完成 | 探索报告摘要、影响范围、技术约束、待设计方案 | 现状约束、关键模块与接口映射 |
 | spec 落盘 | spec 路径、待确认项 | spec 路径、核心方案要点、主要风险 |
-| 用户确认 | 状态「可进入实现」、分支/worktree 建议 | 已确认的方案要点 |
+| 用户确认 | 状态「可进入 code-dev-loop」、`spec_confirmed: yes` | 已确认的方案要点 |
 
 ## 执行检查清单（每次都要走完）
 
@@ -153,8 +158,18 @@ date: YYYY-MM-DD
 
 ## 详细实现步骤
 
+（每步一行，须含 phase / blocking / qa 标注）
+
+- Step 1 — phase-1 — blocking: yes — qa: auto：<描述>
+- Step 2 — phase-1 — blocking: yes — qa: auto：<描述>
+- Step 5 — phase-1 — blocking: no — qa: manual_user：Android 录屏验收（合并后用户执行，不阻塞 merge-ready）
+
 ## 测试策略
 ### 测试用例
+
+（用例须带 id，如 T-W1，供 code-review 矩阵对照）
+
+- T-W1 — blocking: yes — …
 
 ## 风险与回滚方案
 ```

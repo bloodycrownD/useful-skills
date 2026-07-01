@@ -55,6 +55,8 @@ disable-model-invocation: true
 ### A. 需求与 Spec 符合性
 
 - spec / PRD / 用户诉求中的变更点是否已实现
+- **逐步对照**：spec「详细实现步骤」逐步列出 **已实现 / 部分 / 未实现 / 用 fallback 替代**（fallback 须标 P1，未经用户确认不得 phase-ready）
+- **测试用例矩阵**：spec「测试用例」章节有编号（如 T-W1）时，须逐条对照 **已测 / 未测 / 不适用**
 - 验收标准是否可由代码 + 测试支撑
 - API、事件、配置、行为与契约一致
 - **范围蔓延**：改动是否超出 stated scope；遗漏或过度实现均须标注
@@ -150,8 +152,8 @@ disable-model-invocation: true
 | 模式 | 通过条件 |
 |------|----------|
 | `diff` / `explore` | P0 = 0 且 P1 = 0 → **通过**；有 P0 → **阻塞**；仅 P1 → **需修改** |
-| `stage` | P0 = 0 且 P1 = 0 → **phase-ready** |
-| `final` | P0 = 0 且 P1 = 0 且 **K 节全部 ✅** → **merge-ready** |
+| `stage` | P0 = 0 且 P1 = 0，且 spec 步骤无未实现/未确认 fallback，测试用例无遗漏 → **phase-ready** |
+| `final` | 同上（全量）+ **K 节全部 ✅** → **merge-ready** |
 
 独立 CR 时 P2 可单独列为「建议改进」，不阻塞 **通过**。
 
@@ -168,8 +170,10 @@ disable-model-invocation: true
 - <将审查的文件/目录列表>
 
 1）需求符合性
+- 实现步骤矩阵：<Step N → 已实现|部分|未实现|fallback + 证据>
+- 测试用例矩阵（若 spec 有编号）：<T-xx → 已测|未测|N/A>
 - 完成矩阵：<变更点 → 已实现/部分/未实现 + 证据>
-- 范围蔓延（如有）
+- 范围蔓延 / fallback（若有，须标 P0/P1）
 
 2）正确性与健壮性
 - <P0|P1|P2>：<问题> — <文件:行或符号> — <建议>
@@ -210,6 +214,7 @@ disable-model-invocation: true
 
 - [ ] 已明确模式与范围，并列出将读文件
 - [ ] 已读 spec/PRD 或替代需求来源
+- [ ] 已输出实现步骤矩阵；spec 有测试编号时已输出测试用例矩阵
 - [ ] A–G 已覆盖；H–K 已按适用性检查或标注未适用
 - [ ] 每条 P0/P1 含位置与可操作建议
 - [ ] 结论与 must-fix 一致；未用「合并后再改」作为通过理由
@@ -266,6 +271,7 @@ HEAD_SHA：<SHA>
 ## 与 code-dev-loop 的关系
 
 - `cr-stage` / `cr-final`：**强制** readonly 评审子代理 + 本 skill（主代理不可替代）
+- 评审须输出 **实现步骤矩阵** 与 **测试用例矩阵**（spec 有编号时），防止「测了一部分就宣称 ready」
 - 独立 CR（`diff` / `explore`）：不依赖 DAG，主代理可直接评审
 - 本 skill 定义**评什么、怎么判**；`code-dev-loop` 定义**何时评、mode、Context Bundle、循环修复**
 

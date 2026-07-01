@@ -60,6 +60,7 @@ disable-model-invocation: true
    - 存在多种答案或不确定时，分点说明并标注置信度与待验证项
 4. **边界**：
    - 本 skill **不**默认写 PRD、SPEC、任务拆分、不改代码
+   - 探索报告 **仅供答疑**；**不构成**后续 `code-dev-loop` 跳过 impl 子代理的依据（见 code-dev-loop「上游探索 ≠ impl 豁免」）
    - 用户要正式需求或技术文档 → 引导 `prd-generate` / `spec-generate`
    - 用户要迭代内快速改代码（修 bug、小功能）→ 引导 `agile-dev`
    - 用户要按 spec 正式实现 → 引导 `spec-generate` → `spec-check-loop` → `code-dev-loop`（默认 strict，子代理执行；强耦合小 diff 见 compact 例外）
