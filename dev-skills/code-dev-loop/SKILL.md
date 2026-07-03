@@ -1,362 +1,286 @@
 ---
 name: code-dev-loop
-description: 基于 spec 的分阶段 DAG 编排。默认子代理 impl/verify/CR；主代理只编排与 Context Bundle。上游 brain-storm/prd/spec 的探索不构成跳过 impl 子代理的理由。唯一合法终点 merge-ready（或 blocked/partial-delivery 须用户明示）。
+description: 基于 spec 的开发 DAG：impl / verify / cr-func 可波次并行；not-ready 时动态重编排。默认子代理执行。终点 dev-ready。
 disable-model-invocation: true
 ---
 
 # Code Dev Loop
 
-## 最小合规路径（门禁顺序）
+**开发编排** skill：在 **spec 为唯一事实来源** 的前提下，拆解 **开发 DAG**（impl / verify / cr-func / fix），波次并行、not-ready 时动态重编排。终点 **dev-ready**（spec 范围内实现与功能小检完成）。
 
-未完成 **Gn** 不得输出「完成」类话术，不得结束 skill。
-
-```mermaid
-flowchart LR
-  G0[G0 准备+Bundle] --> G1[G1 impl]
-  G1 --> G2[G2 verify]
-  G2 --> G3[G3 cr-stage]
-  G3 -->|not ready| G1f[fix] --> G2
-  G3 -->|phase-ready| G4[G4 cleanup]
-  G4 --> G5[G5 verify-final]
-  G5 --> G6[G6 cr-final]
-  G6 -->|not ready| G6f[fix-final] --> G5
-  G6 -->|merge-ready| G7[G7 结束]
-```
-
-| 门禁 | 节点 | strict | compact |
-|------|------|--------|---------|
-| G1 | impl | 子代理 | 主代理可 inline（须声明） |
-| G2 | verify | 子代理 | **子代理（必须）** |
-| G3 | cr-stage | readonly 子代理 | readonly 子代理（**必须**） |
-| G4–G5 | cleanup / verify-final | 子代理 | 子代理 |
-| G6 | cr-final | readonly 子代理 | readonly 子代理（**必须**） |
+主代理 = 编排；子代理 = impl / verify / cr-func / fix。中文协作。
 
 ---
 
-## 目的
+## 边界
 
-在 **spec 为唯一事实来源** 的前提下，分阶段实现并 **loop 至 closure**。
-
-**为何默认派子代理**：主代理上下文有限；探索、实现、验证、独立 CR 由子代理执行并**摘要回报**，主代理保留编排与决策。
-
-主代理与子代理的协作、说明、评审结论**一律使用中文**（路径、标识符等除外）。
-
----
-
-## ⚠️ 上游探索 ≠ 可跳过 impl 子代理
-
-**常见误判**（必须禁止）：
-
-> 已在 `brain-storm` / `prd-generate` / `spec-generate` 中派探索子代理读过代码 → 主代理「已经了解项目」→ 直接 inline 写实现。
-
-| 阶段 | 探索的目的 | 能否替代 impl 子代理 |
-|------|------------|----------------------|
-| brain-storm | 答疑、摸现状 | ❌ |
-| prd-generate | 写 PRD 的业务现状 | ❌ |
-| spec-generate | 写 spec 的技术现状 | ❌ |
-| code-dev-loop explore | 本 iteration 改动前核对 | ❌ |
-
-**规则**：
-
-1. 上游探索报告 → 写入 **Context Bundle** 的「探索摘要」附件，**不是** impl 豁免券
-2. 主代理为写 PRD/spec 读过代码 = **编排上下文**，不等于 **implementation 已闭环**
-3. **strict（默认）**：无论上游是否探索，**G1 impl 须子代理**（强耦合链 = **单 impl 子代理**包整条链，不是主代理代写）
-4. 仅 **compact**（见下，且 dynamic 声明）允许主代理 G1 inline；**G2 verify、G3/G6 CR 仍须子代理**
-
----
-
-## 对用户合法结束语（仅三种）
-
-| 结束语 | 条件 |
-|--------|------|
-| **merge-ready** | 全部门禁通过 + Closure Status 表 A/B 为空 |
-| **blocked** | 需用户决策（spec 冲突、环境、产品拍板）；列出阻塞项 |
-| **partial-delivery** | **仅当用户本轮明确接受**未闭合项；须列 A/B 类清单，**不得**称为 merge-ready |
-
-**禁止**自造：「phase-1 ready」「核心已完成」「开发完成」「可以合并了」（未 cr-final 时）。
-
----
-
-## 主代理 vs 子代理
-
-| 主代理 | 子代理 |
-|--------|--------|
-| mode、phase、**Bundle-full / Bundle-delta** | G1 impl（strict）/ G2 verify / fix / cleanup |
-| 派任务、同步等待、汇总 must-fix | G3/G6 **readonly code-review** |
-| dynamic（含 `spec_deviations`） | inline 执行并中文回报 |
-
-**硬规则**：G3 / G6 **永远** readonly 评审子代理；**fix 任何 P0/P1 后必须重跑 G3 或 G6**（见 inner loop）。
-
----
-
-## 执行模式（mode）
-
-| mode | G1 impl | G2 verify | G3/G6 CR | 选用条件 |
-|------|---------|-----------|----------|----------|
-| **strict**（默认） | 子代理 | 子代理 | 子代理 readonly | 正式交付 |
-| **compact** | 主代理可 inline | **子代理必须** | **子代理 readonly 必须** | **同时**：单 phase + 单耦合链 + spec 已确认 + **变更文件清单已冻结** |
-| **review-only** | 已完成 | — | cr-final 子代理 | 补救 |
-
-**compact 不再用「≤5 文件」**——Mobile 8 文件耦合链仍可 compact，但须 **单 impl 执行体**（主代理 inline 或 **一个** impl 子代理）。
-
-未在 dynamic 声明 mode 即主代理写代码 → **违规**。
-
-**路由**：小步快跑 → **`agile-dev`**；execute-ready spec → **本 skill strict**。
-
----
-
-## dynamic 必填字段（开始前）
-
-```yaml
-mode: strict | compact | review-only
-spec_path: ...
-spec_confirmed: yes | no   # no → 只读评审 spec 或 AskQuestion，不得 G1
-spec_date: ...              # 与磁盘 spec Front Matter 一致
-spec_deviations: []         # 每项：{ step, planned, actual, status: open|accepted|fixed }
-last_cr_stage: pass|fail|none
-last_cr_final: pass|fail|none
-p0_open: 0
-p1_open: 0
-phase: ...
-inner_round: ...
-outer_round: ...
-```
-
-`spec_confirmed: no` 时不得进入 G1（用户从 spec-generate 直接说「开发吧」须先确认或只读对齐 spec）。
-
----
-
-## 验收分层（merge-ready vs 合并后 QA）
-
-| 类型 | 谁做 | 阻塞 merge-ready |
-|------|------|------------------|
-| 自动化测试 / build | agent（G2/G5） | ✅ 必须 |
-| cr-stage / cr-final P0/P1 = 0 | readonly 评审子代理 | ✅ 必须 |
-| spec `blocking: yes` 的步骤与测试 | agent | ✅ 必须 |
-| 真机 / 录屏 / 主观 UX（spec `blocking: no` 或 `qa: manual_user`） | 用户 | ❌ **不阻塞**；merge-ready 后写入 PR「请你验收」 |
-
-**不得**把 Android 录屏（C 类）与缺测试/cleanup（A/B 类）混在同一 follow-up 列表。
+| 本 skill | 不做 |
+|----------|------|
+| impl、verify、**cr-func**（波次内功能小检） | 全维代码评审、风格/DRY 全局 cleanup |
+| 动态开发 DAG | merge-ready 宣称 |
 
 ---
 
 ## 关键术语
 
-### 交付状态（禁止混用）
+### dev-ready
 
-| 状态 | 能否对用户说「完成」 |
-|------|----------------------|
-| impl-done | ❌ |
-| phase-ready | ❌ 不得结束 skill |
-| pipeline-ready | ❌ 仍须 G6 |
-| **merge-ready** | ✅ 唯一正常终点 |
-| post-merge-qa | 仅 merge-ready **之后**说明 |
+开发 DAG 终点。须同时满足：
 
-### inner / outer loop
+- 所有 impl / verify / cr-func 节点 `done`
+- 各 cr-func 结论为 **func-ready**（见 §func-ready / §cr-func 检查项）
+- spec 中 `blocking: yes` 的步骤已闭合；无 open **spec_deviations**
+- HEAD 已提交或写入 Bundle-full
+
+### func-ready
+
+**cr-func** 节点结论。须：本波次 spec 步骤矩阵 ✅、blocking 测试 id ✅、verify 证据 ✅、无 open spec_deviations。以子代理返回的 **func-ready: yes/no** 为准（检查维度见 §cr-func 检查项）。
+
+### 上游探索 ≠ 跳过 impl
+
+无论探索结论来自何处，**仍须** impl 子代理写代码；探索摘要仅用于 Context Bundle，使 prompt 更清晰。
+
+---
+
+## 子代理派遣规范
+
+| 节点 | 工具 | subagent_type | readonly | 并行 |
+|------|------|---------------|----------|------|
+| **impl** | Task | generalPurpose | false | 无同文件冲突可同 wave |
+| **fix** | Task | generalPurpose | false | 不同文件可同 wave |
+| **verify** | Task | generalPurpose 或 shell | false | 可同 wave |
+| **cr-func** | Task | generalPurpose | **true** | 可同 wave |
+
+- **同步等待** 当前 wave 全部返回后再汇总
+- **失败**：重试一次 → 仍失败则 not-ready，主代理改 DAG 或标注 blocked
+- **同文件禁止** 并行 impl/fix
+
+---
+
+## 动态 DAG
+
+每轮 wave 结束或 **not-ready** 后，主代理 **改图** 并 `dag_version++`。
+
+| 动作 | 何时 |
+|------|------|
+| **并行化** | 无文件冲突的 impl/fix 同 wave |
+| **合并** | 多 fix 同一模块 → 单 fix 节点 |
+| **拆分** | 节点过大或反复 fail → 串行子节点 |
+| **插入 cr-func** | impl 波次后、下一模块前（**须在 DAG 内**） |
+| **优先 P0** | 阻塞下游的 fix 进下一 wave 首部 |
+
+```yaml
+dag_version: 1
+wave_plan: [[impl-a, impl-b], [verify-a, verify-b], [cr-func-ab]]
+node_status:
+  impl-a: { status: done, head_sha: abc123 }
+  cr-func-ab: { status: done, func_ready: yes }
+open_must_fix: []
+spec_deviations: []  # open 项阻塞 dev-ready
+```
+
+**禁止**：not-ready 时只「再派一个 fix」而不更新 `wave_plan` / `dag_version`。
+
+---
+
+## 节点类型
+
+| 类型 | 执行者 | 说明 |
+|------|--------|------|
+| **impl** | 子代理 inline | 强耦合链 → **单 impl 节点**；无冲突可多 impl **同 wave** |
+| **verify** | 子代理 | 依赖上游 impl/fix；同 wave 可并行 |
+| **cr-func** | readonly 子代理 | 波次内 **功能小检**（§cr-func 检查项） |
+| **fix** | 子代理 | 闭合 verify/cr-func 的 must-fix |
+
+典型子图：
 
 ```text
-G1 → G2 → G3 ─not ready─→ fix → G2 → G3（P0/P1 fix 后 G3 必重跑）
-G4 → G5 → G6 ─not ready─→ fix-final → G5 → G6
+wave-0: [impl-core]
+wave-1: [verify-core]
+wave-2: [cr-func-core] ─not ready─→ wave-3: [fix-core] → wave-4: [verify-core, cr-func-core]
+wave-5: [impl-ui, impl-bridge]
+wave-6: [verify-ui, verify-bridge]
+wave-7: [cr-func-ui-bridge]
 ```
 
-- inner 每 phase 最多 **5** 轮；outer 最多 **3** 轮
+**fix 后**：须重跑 **verify + cr-func**（作为新 wave 写入 DAG，不可跳过）。
 
-### Context Bundle
+---
 
-**Bundle-full**（G1、首次 explore、phase 切换）：
+## Context Bundle
+
+### full（首轮 / dev-ready 产出）
+
+```yaml
+spec_path: ...
+prd_path: ...
+spec_summary: ...
+explore_summary: ...    # 若上下文中有
+files_touched_plan: [...]
+contracts: [...]        # API/事件/配置
+head_sha: ...
+blocking_steps: [...]
+```
+
+### delta（fix / 后续 wave）
+
+```yaml
+must_fix: [{ id, severity, file, desc }]
+files_changed: [...]
+prev_cr_func: { node_id, func_ready, open_items }
+head_sha: ...
+```
+
+---
+
+## 开始前
+
+- 工作区干净；非 main/master
+- 用户已确认 spec；已知 Spec / PRD path（dynamic 中有 `spec_confirmed: yes` 则沿用）
+- `apm read` + `apm kb search`（无 APM 时直接读 kb 路径）
+- 读 spec Step：`phase-*`、`blocking: yes/no`
+
+---
+
+## cr-func 检查项
+
+- **A** 本波次 spec 步骤矩阵、blocking 测试 id
+- **G** verify 证据
+- 无 open **spec_deviations**
+
+---
+
+## 总流程
 
 ```text
-【Context Bundle — full】
-- spec_path / spec_confirmed / branch
-- Spec 摘要（≤15 行）
-- 上游探索摘要（brain-storm / prd / spec 报告路径或要点，≤10 行）
-- 已拍板决策（≤7 条）
-- phase、节点 id、文件清单、接口契约、不变量
-- spec_deviations 状态
-- HEAD_SHA
+准备 → Bundle-full → 初始 DAG（含 cr-func 边）
+  → loop:
+      取就绪 wave → 并行派子代理 → 同步等待 → 更新 node_status
+      → 全节点 done 且 cr-func 均 func-ready? ─是→ dev-ready
+      → not-ready? ─→ 重编排（dag_version++）→ 继续
 ```
 
-**Bundle-delta**（fix 轮、重跑 cr 前）：
+同一 must-fix 震荡 ≥3 次 → **blocked**，请用户拍板。
+
+---
+
+## Step 1：初始拆解
+
+1. 按 spec 步骤/模块拆 **impl + verify + cr-func**（依赖边：impl → verify → cr-func）
+2. 拓扑排序得 **wave-0…n**；`blocking: yes` 步骤须落在对应 cr-func 范围
+3. 写入 `dynamic`：节点表、边、wave_plan、`dag_version: 1`
+
+---
+
+## Step 2：波次执行
+
+1. 当前 wave 全部节点 **并行**派发
+2. **同步等待**
+3. 任一 fail / cr-func not func-ready → **not-ready**
+
+### cr-func prompt
 
 ```text
-【Context Bundle — delta】
-- 节点 id、phase、HEAD_SHA
-- 上轮 cr 结论（pass/fail）、last_cr_stage / last_cr_final
-- 本轮 must-fix（P0/P1 列表）
-- 本 fix 涉及文件
-- p0_open / p1_open
+【语言要求】全程中文
+
+readonly 功能小检。节点：<node_id>
+仓库：<REPO_PATH>
+Spec：<SPEC_PATH>
+PRD：<PRD_PATH>
+本波次范围文件：<FILES>
+verify 摘要：<VERIFY_SUMMARY>
+Context Bundle：<YAML>
+
+检查：A（本波次步骤矩阵+blocking 测试 id）、G（verify 证据）、spec_deviations
+
+返回：1）矩阵对照 2）must-fix 3）spec_deviations 4）func-ready: yes|no + 理由
 ```
 
-fix 轮 **用 delta** 即可，避免重复粘贴 full；G1 新 phase 用 full。
-
----
-
-## 开始前检查
-
-- [ ] 工作区干净；非 main/master
-- [ ] `spec_confirmed: yes`（或本轮用户明示确认 spec）
-- [ ] `apm read` + `apm kb search`
-- [ ] mode 写入 dynamic；建 **Bundle-full**
-- [ ] 从 spec 读取各 Step 的 `phase` / `blocking`（见 spec-generate 模板）
-
----
-
-## Step 1：拆 phase（读 spec Step 标注）
-
-spec 每步应含：`Step N — phase-<id> — blocking: yes|no — qa: auto|manual_user`
-
-| blocking | merge-ready |
-|----------|-------------|
-| **yes** | 该 step 实现 + 测试闭合，且无未确认 deviation |
-| **no** | 可不实现；若 spec 标 `manual_user`，归 C 类 |
-
-**单 phase spec 合法**；Step 3 promote、Step 4 测试若 `blocking: yes`，仍是 **同一 phase 内 B 类闭合项**，不得以「核心已做」甩到 follow-up。
-
-**耦合编排**：
-
-- 单耦合链 → **一个** G1 执行体（1 个 impl 子代理 **或** compact 主代理）
-- 无文件冲突的多模块 → 多 impl 子代理可并行
-- 同文件 → 串行
-
----
-
-## Step 2：阶段内循环
-
-### G1 impl
-
-- **strict**：子代理 + Bundle-full
-- **compact**：主代理 inline 前 dynamic 记 compact 理由；**仍须** Bundle-full
-
-### G2 verify（phase）
-
-**本 iteration 最小集**：
-
-- `testPathPattern` / 受影响 workspace 测试
-- 相关 package build（若 monorepo pretest 已 build core，在回报中 **声明**，供 G5 判断是否重复）
-
-### G3 cr-stage
-
-- readonly 子代理 + **code-review** `stage`
-- 更新 dynamic：`last_cr_stage`、`p0_open`、`p1_open`
-- **fix 闭合 P0/P1 后 → 必须重跑 G3**；`last_cr_stage: fail` 时 **禁止** G4
-
-### phase-ready 条件
-
-- G3 pass；P0=P1=0；blocking steps 闭合；`spec_deviations` 无 open
-
----
-
-## Step 3：全局外循环
-
-### G4 cleanup（子代理，不可跳过）
-
-### G5 verify-final
-
-| 与 G2 关系 | 做法 |
-|------------|------|
-| G2 已跑 **同命令** 全量 build + 全量相关测试 | 子代理回报「G5 已覆盖」，列命令与 G2 差异（可为空） |
-| G2 仅窄测 | G5 跑 **repo 级清单**（写入 spec 或 Bundle：如 `npm run build -w @pkg/mobile`） |
-
-### G6 cr-final
-
-- readonly 子代理 + **code-review** `final`
-- 更新 `last_cr_final`
-- **fix-final 后必须重跑 G5 → G6**
-
----
-
-## Spec 偏离（spec_deviations）
-
-实现 ≠ spec 步骤时：
-
-1. `spec_deviations` 追加 `{ step, planned, actual, status: open }`
-2. **open 期间不得 phase-ready / merge-ready**
-3. 闭合：**fixed**（补实现+测试）或 **accepted**（用户确认 + 更新 spec「已知偏差」）
-
----
-
-## Closure 闸门
-
-### Follow-up 三分法
-
-| 类 | 处理 |
-|----|------|
-| **A** pipeline 未完成 | 继续 G4–G6，非 follow-up |
-| **B** spec/测试/deviation | fix 或收窄 spec |
-| **C** manual_user QA | 仅 merge-ready 后 |
-
-### Closure Status 表（每次汇报必附）
-
-```markdown
-## Closure Status
-| 检查项 | 状态 |
-| 当前交付状态 | impl-done / … / merge-ready / paused-not-ready / blocked |
-| spec_confirmed | yes/no |
-| spec_deviations open | 0 / 列表 |
-| G3 last_cr_stage | pass/fail/none；fix 后是否已重跑 |
-| blocking steps + 测试 id | ✅/❌ |
-| G4 cleanup | ✅/❌ |
-| G5 verify-final | ✅/❌ |
-| G6 cr-final | ✅/❌ |
-| A/B 未完成 | 必须空才 merge-ready |
-| C 合并后 QA | 仅 merge-ready 后填 |
-```
-
-### 暂停 / 部分交付
-
-- **paused-not-ready**：列出 A/B 待续，不得称完成
-- **partial-delivery**：仅用户明示接受；仍 **不得** 称 merge-ready
-
----
-
-## 与上游 skill 衔接
-
-| 上游 | 交给 code-dev-loop 的 |
-|------|------------------------|
-| spec-check-loop | execute-ready spec + Bundle 素材 |
-| spec-generate | `spec_confirmed: yes`、探索报告路径、Step blocking 标注 |
-| brain-storm | 探索摘要（**不**替代 G1 子代理） |
-
----
-
-## 派遣约束
-
-### 语言要求（执行类 prompt 必含）
+### impl / fix / verify prompt 模板
 
 ```text
 【语言要求】
-- 全程使用中文；代码注释与公开 API 文档注释中文；commit message 中文
-```
+- 全程使用中文：任务说明、过程、结论、返回报告
+- 代码注释与公开 API 文档注释须中文；commit message 中文
+- 标识符、协议字段、第三方 API 名保持英文
 
-### fix 后重 CR（写入 fix prompt）
+节点：<node_id>，类型：<impl | fix | verify>
+仓库/worktree：<PATH>
+分支：<BRANCH>
+Spec / PRD：<路径>
+Context Bundle：
+<粘贴 full 或 delta YAML>
 
-```text
-本轮为 P0/P1 修复。完成后须重跑 verify，并等待新一轮 cr-stage/cr-final。
-禁止在未重跑 CR 前宣称 ready。
+任务：<本节点具体目标，含 spec 步骤 id>
+约束：
+- impl/fix：单次 inline 连续执行；按逻辑块提交；不 revert 无关改动
+- verify：运行与改动相关的测试/build；记录命令与结果
+
+请用中文按下列结构返回：
+1）已完成项与剩余缺口
+2）提交记录（sha + message，无则写「无提交」）
+3）验证命令及通过/失败
+4）阻塞项（如有）
 ```
 
 ---
 
-## 失败处理
+## Step 3：动态重编排（not-ready）
 
-子代理失败：重试一次 → 仍失败则 `manual-review` 整理 must-fix，**strict 下不得长期主代理代 impl**。
+1. 收集 open must-fix、failed 节点
+2. 按「动态 DAG」表改图：新增 fix、调整 wave、必要时重插 cr-func
+3. `dag_version++` → 回到 Step 2
+
+---
+
+## dev-ready
+
+### 检查清单
+
+- [ ] DAG 内 impl/verify/cr-func 均 `done`
+- [ ] 各 cr-func **func-ready: yes**
+- [ ] blocking spec 步骤闭合；spec_deviations 无 open
+- [ ] HEAD 写入 Bundle-full
+
+**禁止**在未完成上述项时宣称 merge-ready。
+
+### 完成产出（Bundle-full，供用户或后续任务取用）
+
+```yaml
+spec_path: ...
+prd_path: ...
+branch: ...
+base_sha: ...
+head_sha: ...
+bundle_full: { ... }
+dev_dag_matrix: { node_id: done, ... }
+spec_deviations: []
+```
+
+---
+
+## 对用户结束语
+
+| 状态 | 含义 |
+|------|------|
+| **dev-ready** | 开发 DAG 完成，spec 范围内实现已闭合 |
+| **blocked** | 需用户决策 |
+| **in-progress** | 汇报 wave / dag_version，不称完成 |
 
 ---
 
 ## 执行检查清单
 
-- [ ] dynamic 必填字段齐全；`spec_confirmed: yes`
-- [ ] **未**因上游已探索而跳过 G1 子代理（compact 须声明）
-- [ ] G2/G3/G4/G5/G6 子代理；G3/G6 readonly + code-review
-- [ ] **P0/P1 fix 后已重跑 G3/G6**（查 `last_cr_stage/final`）
-- [ ] `spec_deviations` 无 open
-- [ ] blocking steps + 测试闭合
-- [ ] 已附 Closure Status 表
-- [ ] 结束语仅为 merge-ready / blocked / partial-delivery（用户接受）
+- [ ] 用户已确认 spec（或 dynamic 中 `spec_confirmed: yes`）
+- [ ] 初始 DAG **含 cr-func 节点与边**
+- [ ] 无冲突节点已尝试 **wave 并行**
+- [ ] not-ready 已 **重编排**（dag_version 递增）
+- [ ] fix 后已重跑 verify + cr-func
+- [ ] dev-ready 时未自称 merge-ready
 
 ---
 
 ## 备注
 
-- 文档：`.apm/kb/docs/Iterations/<需求名称>/spec.md`
-- 主对话上下文 >50% → **禁止** compact 继续 inline，改 strict
-- 小 diff（如 <200 行）且单 phase：可 **省略 G3 仅做 G6** 仅当用户明示「跳过 stage CR」；**默认仍跑 G3**
+- 偏离 spec：dev-ready 前须 fix 或用户确认收窄并记入 spec_deviations
+- 同文件禁止并行 impl

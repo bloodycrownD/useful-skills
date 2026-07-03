@@ -6,10 +6,17 @@ disable-model-invocation: true
 
 # PRD 生成
 
+## 边界
+
+本 skill **只输出 PRD**（`prd.md`），不展开技术方案、接口设计、数据库结构、任务拆分等 spec 内容。
+
+---
+
 ## 使用说明
 
 1. **在首次 `AskQuestion` 之前，必须先完成项目探索**（不可跳过）：
-   - 主代理执行 `apm read`，并配合 `apm kb search --q "<关键词>"` 检索相关 PRD、历史迭代与文档（仅此步可由主代理直接做）
+   - **APM 可用时**：主代理执行 `apm read`，并配合 `apm kb search --q "<关键词>"` 检索相关 PRD、历史迭代与文档（仅此步可由主代理直接做）
+   - **无 APM 环境**：直接读取 `.apm/kb/docs/...` 或用户指定路径下的已有 PRD/文档；检索不足时向用户索取路径
    - **探索代码与业务现状须派遣多个子代理**（见「探索阶段」），主代理 **不得** 自行深入读代码、扫目录替代子代理
    - 主代理根据各子代理返回的 **探索报告** 汇总「现状摘要」：已有能力、缺口、可能影响范围（仅业务视角，不写技术方案）
    - **阶段完成**：更新 `dynamic`（探索报告摘要、现状摘要、待澄清问题）与 `persist`（已确认的项目术语、既有能力边界）
@@ -21,12 +28,17 @@ disable-model-invocation: true
      - 范围（包含 / 不包含）
      - 成功指标（可量化）
      - 验收标准
+   - **终止条件**（满足其一即可结束澄清阶段）：
+     - 上述五类关键信息已齐备
+     - 用户明确表示叫停或无需继续追问
+     - 剩余缺口已写入 PRD「风险与待确认项」（或扩展章节等价位置），可带缺口进入落盘
+   - **`AskQuestion` 不可用时**：在回复中只提**一个**聚焦问题，等用户回答后再继续下一轮澄清（规则同上）
    - **阶段完成**：更新 `dynamic`（已澄清项、待确认项、下一步）与 `persist`（用户已确认的关键决策）
 3. 澄清完成后，生成 PRD 并写入 APM 知识库：
    - `.apm/kb/docs/Iterations/<需求名称>/prd.md`
    - 多行可用 heredoc：`cat <<'EOF' | apm kb write --path Iterations/<需求名称>/prd.md --stdin`（见 `apm-usage`），或直接写文件
-   - 写完后执行 `apm kb index rebuild`（便于 `apm read` 联想检索）
-   - **阶段完成**：更新 `dynamic`（PRD 路径、状态「待用户确认」或「已完成」）与 `persist`（需求名称、PRD 路径、核心范围与验收要点）
+   - **APM 可用时**写完后执行 `apm kb index rebuild`（便于 `apm read` 联想检索）；无 APM 时直写文件即可
+   - **阶段完成**：更新 `dynamic`（PRD 路径、状态「待用户确认」）与 `persist`（需求名称、PRD 路径、核心范围与验收要点）
 4. `prd.md` 须符合「文档格式规范」（YAML Front Matter + 正文），默认输出轻量 PRD，正文至少包含：
    - 背景（含与现状的关系）
    - 目标（含成功指标）
@@ -36,6 +48,7 @@ disable-model-invocation: true
    - 验收标准
 5. 验收标准必须可测试、可判定，优先使用清单或 Given / When / Then 表达。
 6. 明确告知生成路径，并请用户进行最终确认。
+   - **用户确认 PRD 后**：更新 `dynamic`（`prd_confirmed: yes`、阶段状态「已完成」）
 7. 明确边界：本 skill 只输出 PRD，不展开技术方案、接口设计、数据库结构、任务拆分等技术 spec 内容。
 8. 如用户明确需要，再按需追加「扩展章节」（非默认）：
    - 约束与依赖
@@ -50,9 +63,18 @@ disable-model-invocation: true
 ### 主代理职责
 
 1. 基于用户描述与 `apm kb search` 结果，将探索面拆为 **2–4 个互不重叠的子任务**（例如：用户入口与页面流程、核心业务模块、对外接口/配置、历史 PRD/文档）
-2. **并行** 派遣多个 readonly 探索子代理（`Task`，`subagent_type: explore`，`readonly: true`），**同步等待** 全部返回
-3. 汇总各报告为「现状摘要」，再进入 `AskQuestion`
-4. 子代理报告有缺口或矛盾时，可补派一轮聚焦探索（仍由子代理执行）
+2. **并行** 派遣 **2–4** 个 readonly 探索子代理（`Task`，`subagent_type: explore`，`readonly: true`），**同步等待** 全部返回
+3. 汇总各报告为「现状摘要」，再进入澄清（`AskQuestion` 或等价单问）
+4. 子代理报告有缺口或矛盾时，可补派聚焦探索（仍由子代理执行）；**补派上限 2 轮**
+
+### 子代理派遣规范
+
+| 项 | 值 |
+|----|-----|
+| 工具 | `Task`，`subagent_type: explore` |
+| readonly | **true** |
+| 并行 | 2–4 个，同步等待 |
+| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，dynamic 记录 |
 
 ### 主代理禁止
 
@@ -106,22 +128,30 @@ disable-model-invocation: true
 |------|---------------------|---------------------|
 | 探索完成 | 探索报告摘要、现状摘要、涉及模块、待澄清问题 | 项目术语、既有能力边界 |
 | 澄清完成 | 已确认目标/范围/指标、剩余缺口 | 用户已拍板的关键决策 |
-| PRD 落盘 | PRD 路径、阶段状态、下一步（如 spec-generate） | 需求名称、PRD 路径、核心范围与验收要点 |
+| PRD 落盘 | PRD 路径、阶段状态「待用户确认」 | 需求名称、PRD 路径、核心范围与验收要点 |
+| 用户确认 PRD | `prd_confirmed: yes`、阶段状态「已完成」 | （沿用 PRD 落盘时的 persist） |
 
 - `dynamic`：全量覆盖当前任务进度与下一步。
 - `persist`：仅写入已确认、可长期复用的结论；避免堆砌过程细节。
+- **无 APM 环境**：`dynamic` / `persist` 可写入 `docs/.iteration-state.yaml`（或用户指定路径），或在对话内用 YAML 块等价维护；字段含义与上表一致。
+
+## 环境与工具 fallback
+
+- **无 APM 环境**：知识库直读 `.apm/kb/docs/...` 或用户指定路径；PRD 落盘直写等价路径；`dynamic` / `persist` 见「阶段记忆更新」
+- 下列 **`apm` 命令仅在 APM 可用时执行**；不可用时以读/写文件与对话内状态为准
 
 ## 执行检查清单（每次都要走完）
 
-- [ ] 已执行 `apm read` 与 `apm kb search`
+- [ ] **APM 可用时**已执行 `apm read` 与 `apm kb search`（不可用时已直读 kb 路径或用户指定文档）
 - [ ] 已派遣多个 readonly 探索子代理并 **同步等待** 全部探索报告
 - [ ] 主代理已汇总探索报告并形成现状摘要（非主代理直接读代码）
 - [ ] 探索后已更新 `dynamic` 与 `persist`
-- [ ] 已基于探索结论使用 `AskQuestion` 澄清关键信息
+- [ ] 已基于探索结论澄清关键信息（优先 `AskQuestion`；不可用时在回复中单问并等待用户回答）
 - [ ] 澄清后已更新 `dynamic` 与 `persist`
-- [ ] 已生成 `.apm/kb/docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）并已 `apm kb index rebuild`
+- [ ] 已生成 `.apm/kb/docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；**APM 可用时**已 `apm kb index rebuild`
 - [ ] PRD 落盘后已更新 `dynamic` 与 `persist`
 - [ ] 已明确 PRD 路径并请用户最终确认
+- [ ] 用户确认后已更新 `dynamic`（`prd_confirmed: yes`、状态「已完成」）
 - [ ] 未输出技术 spec（接口设计、库表、任务拆分等）
 
 ## 文档格式规范（PRD）

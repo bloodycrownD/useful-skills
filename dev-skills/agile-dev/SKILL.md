@@ -8,11 +8,23 @@ disable-model-invocation: true
 
 在**已有迭代**（`Iterations/<需求名称>/`）内做轻量、快速的代码交付：先摸清上下文，再派子代理改代码，**代码完成并验证通过后**在 `bugs/` 或 `features/` 下补充 `prd.md` 与 `spec.md` 留痕。
 
-与 `prd-generate` → `spec-generate` → `code-dev-loop` 的正式流水线互补：本 skill **先实现、后文档**，适合小步快跑；**有 execute-ready spec 的正式交付**仍走 `code-dev-loop`（默认 strict，子代理为主）。
+本 skill 特点：**先实现、后文档**，适合迭代内小步快跑。
 
 主代理负责编排；**探索与实现类工作须派子代理完成**，主代理不得跳过子代理自行深入读代码或改代码（资源故障见「失败处理」）。
 
 主代理与子代理的协作、说明、文档与回复**一律使用中文**（路径、标识符、协议字段等除外）。
+
+---
+
+## 适用范围
+
+本 skill 面向**范围可控**的迭代内变更。下列情况须**停止**并在回复中说明原因，请用户缩小范围或换用其他方式：
+
+- 无法定位根因或复现条件（bug）
+- 变更明显跨多模块、改公共 API、与用户未确认的父级 PRD 验收冲突
+- 用户要求的全维评审/正式 spec 驱动交付（超出本 skill 职责）
+
+实现后 **最低质量闸**：针对性测试 + 项目约定 build 已通过。
 
 ---
 
@@ -47,7 +59,7 @@ disable-model-invocation: true
 ### 输入来源
 
 - 用户当轮描述（现象、诉求、变更点）
-- **前文讨论结果**（如 `brain-storm` 答疑、对话中已拍板的结论）— 主代理须显式纳入探索结论与实现 prompt，避免重复劳动
+- **前文讨论结果**（对话中已拍板的结论、答疑要点）— 若对话中已有探索结论，主代理须将其纳入实现 prompt，**但不得跳过 Step 2 探索**
 
 ---
 
@@ -81,6 +93,17 @@ disable-model-invocation: true
 - 自行深入读代码替代子代理
 - 未等探索子代理返回即派实现或下结论
 
+### 子代理派遣规范（探索）
+
+| 项 | 值 |
+|----|-----|
+| 工具 | `Task`，`subagent_type: explore` |
+| readonly | **true** |
+| 并行 | 1–3 个，同步等待 |
+| 失败 | 重试一次 → 手工探索，dynamic 标注 |
+
+**阶段完成**：更新 `dynamic`（探索结论、待实现项）与 `persist`（根因/变更要点、关键模块映射）。
+
 ### 探索子代理须返回（探索报告）
 
 ```text
@@ -109,8 +132,6 @@ disable-model-invocation: true
 请先列出将阅读的文件/目录，再按「探索报告」结构返回。
 ```
 
-**阶段完成**：更新 `dynamic`（探索结论、待实现项）与 `persist`（根因/变更要点、关键模块映射）。
-
 ---
 
 ## Step 3：子代理实现（同步等待）
@@ -118,11 +139,19 @@ disable-model-invocation: true
 探索结论足以动手时：
 
 1. 切换到推荐分支（`fix/...` 或 `feature/...`）或独立 worktree
-2. 向子代理派发 **单个 inline 实现任务**（`Task`，按任务选 `generalPurpose` 等），**须同步等待**返回
-3. 子代理 prompt **开头**须含「语言要求」块（与 `code-dev-loop` 一致）
+2. 向子代理派发 **单个 inline 实现任务**（`Task`，`subagent_type: generalPurpose`，`readonly: false`），**须同步等待**返回
+3. 子代理 prompt **开头**须含「语言要求」块（见下方 impl 模板）
 4. 任务 prompt 须包含：仓库路径、分支、类型、探索结论、约束（单次 inline、按逻辑块提交、针对性测试/构建、中文注释与 commit）
 5. 子代理须**中文**返回：已完成项、提交（sha + message）、验证结果、阻塞项
-6. 返回不合格或验证失败：修正 prompt 或补探索后**重派**，不得口头宣称完成
+6. 返回不合格或验证失败：修正 prompt 或补探索后**重派**；同一问题重试 **≤3 次**，仍失败 → **blocked**，请用户拍板
+
+### 子代理派遣规范（实现）
+
+| 项 | 值 |
+|----|-----|
+| 工具 | `Task`，`subagent_type: generalPurpose` |
+| readonly | **false**（单次 inline，禁止再拆子代理） |
+| 失败 | 重试一次（资源）→ 修正 prompt 重派；震荡 ≥3 → blocked |
 
 ### 子代理实现 Prompt 模板
 
@@ -171,6 +200,8 @@ disable-model-invocation: true
 
 未通过则回到 Step 2 或 Step 3，不得进入留痕文档。
 
+**阶段完成**：更新 `dynamic`（验证结果、是否通过）与 `persist`（验证命令摘要、通过/失败结论）。
+
 ---
 
 ## Step 5：留痕文档（实现之后）
@@ -193,6 +224,7 @@ disable-model-invocation: true
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `date` | string | 是 | `YYYY-MM-DD` |
+| `agile_trace` | boolean | 是 | 固定 `true`，标记后补留痕 spec |
 
 ### prd.md 模板（按类型取舍章节）
 
@@ -249,6 +281,7 @@ dependency: Iterations/<需求名称>/prd.md
 ```markdown
 ---
 date: YYYY-MM-DD
+agile_trace: true
 ---
 
 # <敏捷名称> 实现规格（SPEC）
@@ -277,24 +310,14 @@ date: YYYY-MM-DD
 
 ---
 
-## 与相关 skill 的分工
-
-| Skill | 何时用 |
-|-------|--------|
-| `brain-storm` | 先答疑、摸现状，再决定是否进入敏捷开发 |
-| **`agile-dev`** | 迭代内小 bug / 小 feature，先实现后留痕 |
-| `prd-generate` / `spec-generate` / `code-dev-loop` | 新需求或大范围正式交付 |
-| `spec-check-loop` | 正式 spec 编码前质量闸门 |
-
----
-
 ## 阶段记忆更新
 
 | 阶段 | dynamic | persist |
 |------|---------|---------|
 | 准备 | 类型、敏捷名称、迭代、分支计划 | 父级 PRD 路径 |
 | 探索完成 | 探索结论、待实现项 | 根因/变更要点、模块映射 |
-| 实现完成 | 分支、HEAD_SHA、验证结果 | 实现要点、主要提交 |
+| 实现完成 | 分支、HEAD_SHA | 实现要点、主要提交 |
+| 验证完成 | 验证结果、是否通过 | 验证命令摘要、通过/失败结论 |
 | 文档落盘 | prd/spec 路径、待确认 | 敏捷项路径、摘要 |
 | 用户确认 | 状态「敏捷项已完成」 | 已确认摘要 |
 
