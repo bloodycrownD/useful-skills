@@ -1,22 +1,16 @@
 ---
 name: spec-check-loop
-description: 子代理循环审查 PRD/SPEC 并对照代码库提出修改意见，主代理修复文档后重复审查直至 execute-ready。适用于文档收敛、编码前的质量闸门。用户提及 spec check loop、文档审查循环、execute ready、PRD/SPEC 复审时使用。
+description: 子代理循环审查 PRD/SPEC 并对照代码库提出修改意见；not-ready 时由子代理修复文档。主代理=编排（拆 wave、派 Task、同步等待、汇总、改 doc_fix_plan/dag_version、汇报）。适用于文档收敛、编码前的质量闸门。用户提及 spec check loop、文档审查循环、execute ready、PRD/SPEC 复审时使用。
 disable-model-invocation: true
 ---
 
 # Spec Check Loop
 
-## 目的
+**文档审查编排** skill：通过「审查 → 子代理 doc-fix → 再审查」循环，使 PRD/SPEC 达到 **execute-ready**（文档可支撑按 spec 编码）。
 
-通过「审查 → 修复文档 → 再审查」循环，使 PRD/SPEC 达到 **execute-ready**（文档可支撑按 spec 编码）：
-
-1. 子代理对照 **代码库** 审查 PRD/SPEC（非仅读文档）
-2. 主代理根据必改项 **修复 PRD/SPEC**（可顺带小改 PRD 与 SPEC 不一致处）
-3. 重复直至 **execute-ready**，或用户叫停 / 达到轮次上限
+主代理 = 编排；子代理 = **review**（readonly 审查）/ **doc-fix**（修复 PRD/SPEC）。中文协作。
 
 本 skill **只收敛文档**；不写实现代码、不跑实现向 DAG。
-
-主代理与子代理的协作、说明、评审结论**一律使用中文**（路径、标识符、协议字段等除外）。
 
 ---
 
@@ -42,35 +36,39 @@ disable-model-invocation: true
 
 ### 审查轮（review round）
 
-一次完整的：**子代理 readonly 审查 → 主代理汇总 →（若未 ready）文档修复 → 下一轮**。
+一次完整的：**子代理 readonly 审查 → 主代理汇总 →（若未 ready）派遣 doc-fix 子代理并同步等待 → 下一轮**。
 
 轮次从 1 开始；`dynamic` 记录当前轮次与上轮 must-fix 闭合情况。
 
 ### 同步等待
 
-每轮审查须 **派发子代理并等待返回** 后再决定修复或结束；禁止未审即改、未改即宣称 ready。
+每轮审查须 **派发审查子代理并等待返回** 后再汇总；not-ready 时须 **派发 doc-fix 子代理并等待返回** 后再进入下轮审查。禁止未审即改、未等 fix 即宣称 ready。
 
 ### 子代理派遣规范
 
-| 项 | 值 |
-|----|-----|
-| 工具 | `Task`，`subagent_type: generalPurpose` |
-| readonly | **true**（审查子代理禁止改文件） |
-| 并行 | 每轮 **一个**审查子代理；文档 fix 默认主代理直改（见审查轮重编排）；大文档可拆 scope 后单轮汇总 |
-| 失败 | 重试一次 → 主代理手工等效审查，标注「手工审查」 |
+| 节点 | 工具 | subagent_type | readonly | 并行 |
+|------|------|---------------|----------|------|
+| **review** | Task | generalPurpose | **true** | 每轮 **一个**审查子代理；大文档可拆 scope 后单轮汇总 |
+| **doc-fix** | Task | generalPurpose | **false** | 无同文件冲突可同 wave |
+
+- **同步等待** 当前 wave 全部 doc-fix 返回后再汇总、进入下轮审查
+- **同文件禁止** 并行 doc-fix（PRD 与 SPEC 视为不同文件）
+- **失败**：重试一次 → 仍失败则主代理可手工等效 doc-fix，标注「手工 doc-fix」（见「失败处理」）
 
 ---
 
 ## 审查轮重编排
 
-文档审查循环在 **not-ready 时重编排**，而非固定「审→改→审」单线：
+文档审查循环在 **not-ready 时重编排**，而非固定「审→改→审」单线（与 code-dev-loop 的 fix 重编排对称）：
 
-| 动作 | 默认 / 条件 |
-|------|-------------|
-| **文档 fix** | **默认**主代理直接编辑 PRD/SPEC |
-| **并行文档 fix**（可选） | 仅当 must-fix **跨 PRD+SPEC 多章节** 且 **≥3 条 P1** 时，可派非 readonly 子代理分 wave 改文档（仍须下轮审查） |
+| 动作 | 何时 |
+|------|------|
+| **并行化** | 无文件冲突的 doc-fix 同 wave |
+| **合并** | 多 doc-fix 同一章节/模块 → 单 doc-fix 节点 |
+| **拆分** | 节点过大或反复 fail → 串行子节点 |
 | **合并审查** | 多文档同类问题 → 单审查子代理一轮覆盖 |
 | **拆分审查** | 文档过大 → 分 scope 审查再汇总 |
+| **优先 P0** | 阻塞下游的 must-fix 进下一 wave 首部 |
 
 ```yaml
 dag_version: 1
@@ -78,11 +76,11 @@ review_round: 2
 prd_path: .apm/kb/docs/Iterations/<name>/prd.md
 spec_path: .apm/kb/docs/Iterations/<name>/spec.md
 open_must_fix: []
-doc_fix_plan: [[spec-§3], [prd-验收, spec-测试]]  # 可选 wave；完成后置 []
+doc_fix_plan: [[spec-§3], [prd-验收, spec-测试]]  # wave 计划；完成后置 []
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | execute-ready 已确认
 ```
 
-**禁止**：No-Go 后只改一处不更新 `doc_fix_plan` / 不进入下轮审查。
+**禁止**：No-Go 后只改一处不更新 `doc_fix_plan` / `dag_version` / 不进入下轮审查。
 
 无 APM 时：用 `docs/.iteration-state.yaml` 或对话内 YAML 块等价维护。
 
@@ -106,10 +104,14 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
                           ↓
               execute-ready? ─是→ 通知用户确认 → 结束
                           ↓否
-              主代理修复 PRD/SPEC → 轮次 +1 → 回到 [审查子代理]
+              拆 wave → [doc-fix 子代理] → 同步等待 → 轮次 +1 → 回到 [审查子代理]
 ```
 
 **轮次上限**：默认 **5** 轮；仍 No-Go 时向用户汇报未闭合 P0 并请求拍板，勿自行宣布 ready。
+
+**主代理职责**（仅此）：拆 wave、派 Task、同步等待、汇总、改 `doc_fix_plan` / `dag_version`、向用户汇报。
+
+**主代理禁止**：直接编辑 PRD/SPEC 闭合 must-fix；未等 doc-fix 子代理返回即进入下轮审查。
 
 ---
 
@@ -168,7 +170,7 @@ P0 定义：矛盾、缺失 API/验收、与现有代码冲突、实施必打架
 
 ## Step 2：主代理汇总与决策
 
-收到子代理报告后：
+收到审查子代理报告后：
 
 1. **去重合并** 与子代理结论；主代理可补一条自己发现的 P0（须注明证据）
 2. **判定本轮状态**：
@@ -176,15 +178,29 @@ P0 定义：矛盾、缺失 API/验收、与现有代码冲突、实施必打架
    - **not ready**：存在未闭合 P0，或子代理 No-Go
 3. **向用户简短汇报**（一轮一次）：轮次、P0 数量、是否 ready；**not ready** 时列出 P0 标题
 
+**主代理禁止**：亲自编辑 PRD/SPEC 闭合 must-fix（须进入 Step 3 派 doc-fix 子代理）。
+
+not ready 时：根据 must-fix 拆 wave、写入 `doc_fix_plan`，`dag_version++`，进入 Step 3。
+
 ---
 
-## Step 3：修复文档（仅 not ready 时）
+## Step 3：派遣文档 fix 子代理（仅 not ready 时）
 
-**默认**：主代理 **直接编辑** PRD/SPEC。
+not ready 时，主代理 **必须** 派遣 doc-fix 子代理修复 PRD/SPEC，**不得**主代理直改。
 
-**可选并行 doc fix**：仅当 must-fix **跨 PRD+SPEC 多章节** 且 **≥3 条 P1** 时，可派 `generalPurpose` 非 readonly 子代理分 wave 改文档（仍须下一轮审查）。
+### 派遣规则
 
-### 文档 fix 子代理 prompt 模板（可选并行时用）
+1. 按 `doc_fix_plan` 取当前 wave；无冲突的 doc-fix **并行**派发
+2. **同步等待** 当前 wave 全部返回后再汇总
+3. 同一 must-fix 重派 **≤3 次**；仍失败 → **blocked**，请用户拍板
+4. 全部 doc-fix 完成后 `doc_fix_plan` 置空，状态「待下轮审查」，轮次 +1
+
+### 主代理禁止
+
+- 直接编辑 PRD/SPEC 闭合 must-fix
+- 未等 doc-fix 子代理返回即进入下轮审查
+
+### doc-fix 子代理 prompt 模板（派遣用）
 
 ```text
 【语言要求】
@@ -213,18 +229,16 @@ must-fix 清单（须在本 wave 内闭合）：
 4）阻塞项（如有）
 ```
 
-修复原则：
+### doc-fix 原则（子代理须遵守）
 
 - **只改文档** 闭合 must-fix；不顺手改实现代码
 - P0 必须在本轮修复中闭合
 - P1：优先修；来不及则写入 SPEC「风险与实现注」并标为已知限制
 - 修复后 **同步 PRD 与 SPEC**（验收、命名、契约一致）
 - 大改契约时检查 `dependency` 前置 PRD 是否需同步一句
-- 更新 `doc_fix_plan`：列出本轮要改的 PRD/SPEC 章节；并行 fix 时按 wave 写入 `dynamic.doc_fix_plan`
-- 全部 doc fix 完成后 `doc_fix_plan` 置空，状态「待下轮审查」
 - 若修改了 kb 内 PRD/SPEC 且 APM 可用：执行 `apm kb index rebuild`
 
-**修复完成**：更新 `dynamic`（轮次、上轮 must-fix 闭合列表、状态「待下轮审查」）与 `persist`（已拍板契约要点、仍开放 P1）。
+**修复完成**：主代理更新 `dynamic`（轮次、上轮 must-fix 闭合列表、状态「待下轮审查」）与 `persist`（已拍板契约要点、仍开放 P1）。
 
 ---
 
@@ -275,7 +289,13 @@ must-fix 清单（须在本 wave 内闭合）：
 
 ## 失败处理
 
-**子代理失败**（超时、资源）：等待后重试一次；仍失败则主代理执行等效 readonly 审查（读文档+代码），标注「手工审查」，下轮尽量恢复子代理。
+**审查子代理失败**（超时、资源）：等待后重试一次；仍失败则主代理执行等效 readonly 审查（读文档+代码），标注「手工审查」，下轮尽量恢复子代理。
+
+**doc-fix 子代理失败**（超时、资源）：
+
+1. 短暂停顿后重试一次
+2. 仍失败：主代理可手工完成 doc-fix，但须同样闭合 must-fix 并记录于 dynamic，标注「手工 doc-fix」
+3. 资源恢复后优先回到子代理流程
 
 **多轮震荡**（同一 P0 反复出现）：停止自动循环，请用户拍板二选一写进 SPEC。
 
@@ -286,6 +306,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - [ ] 已读 PRD + SPEC + dependency 前置
 - [ ] 每轮已派 readonly 审查子代理并 **同步等待**
 - [ ] 审查含代码库对照，非空泛文档互审
+- [ ] not-ready 时已派 doc-fix 子代理并 **同步等待**（非主代理直改）
 - [ ] P0 闭合后才可宣称 execute-ready
 - [ ] 未在用户确认前开始编码
 - [ ] 已更新 dynamic / persist（若 APM 可用）

@@ -1,14 +1,23 @@
 ---
 name: code-review-loop
-description: 基于 PRD/spec 的评审 DAG：review / fix / verify / cleanup-check 波次并行，not-ready 时动态重编排，直至 review-ready。含 func 模式用于波次内功能小检。可独立 diff 评审。
+description: 基于 PRD/spec 的评审 DAG：review / fix / verify / cleanup-check 波次并行，not-ready 时动态重编排，直至 review-ready。含 func 模式用于波次内功能小检。可独立 diff 评审。默认子代理执行。
 disable-model-invocation: true
 ---
 
 # Code Review Loop
 
-**质量评审** skill：对照 **PRD + spec**（及用户提供的 diff 范围），用 **动态 DAG** 循环至 **review-ready**。可独立用于 PR 评审，也可在用户指定的代码变更范围内运行。
+**质量评审** skill：对照 **PRD + spec**（及用户提供的 diff 范围），拆解 **评审 DAG**（review / fix / verify / cleanup-check），波次并行、not-ready 时动态重编排。可独立用于 PR 评审，也可在用户指定的代码变更范围内运行。终点 **review-ready**。
 
-主代理 = 编排；review = readonly 子代理；fix / verify / cleanup = 执行子代理。中文协作。
+主代理 = 编排；子代理 = review / fix / verify / cleanup-check。中文协作。
+
+---
+
+## 主代理禁止
+
+- **自审**：review* 须 readonly 子代理，主代理不得代替 review 节点做评审
+- **自改代码**：fix 须 Task 子代理 inline 执行，主代理不得直接编辑代码
+- **自跑 verify / cleanup-check**：须 Task 子代理执行测试/build/lint/format，主代理不得自跑替代
+- **not-ready 时口头 fix**：不得只描述修复方案而不派 fix 子代理；须更新 `wave_plan` 并 `dag_version++`
 
 ---
 
@@ -61,12 +70,12 @@ review* 节点 **须 readonly**；实现者 **不得**自审。
 | 节点 | 工具 | subagent_type | readonly | 说明 |
 |------|------|---------------|----------|------|
 | **review** / **review-scope** / **review-full** | Task | generalPurpose | **true** | 非自审 |
-| **fix** | Task | generalPurpose | false | 闭合 must-fix |
-| **verify** | Task | generalPurpose 或 shell | false | 测试/build |
-| **cleanup-check** | Task | generalPurpose 或 shell | false | K 节 lint/format/清调试 |
+| **fix** | Task | generalPurpose | false | **必须**子代理；闭合 must-fix |
+| **verify** | Task | generalPurpose 或 shell | false | **必须**子代理；测试/build |
+| **cleanup-check** | Task | generalPurpose 或 shell | false | **必须**子代理；K 节 lint/format/清调试 |
 
-- 同 wave 无冲突可并行；**同步等待**
-- 失败：重试一次 → not-ready 重编排或 blocked
+- fix / verify / cleanup-check **必须** Task 子代理；主代理 **不得** inline 改代码、不得自跑 lint/test 替代子代理
+- 同 wave 无冲突可并行；**同步等待** 当前 wave 全部返回后再汇总
 
 ---
 
@@ -97,7 +106,7 @@ open_must_fix: []
 | 类型 | 执行者 |
 |------|--------|
 | **review** / **review-scope** / **review-full** | readonly |
-| **fix** | inline 子代理 |
+| **fix** | 子代理（inline 执行） |
 | **verify** | 子代理 |
 | **cleanup-check** | 子代理 |
 
@@ -162,10 +171,13 @@ P0/P1 必须 0 才 ready；P2 可列建议。
 
 ```text
 准备 → 读 PRD/spec/变更范围 → 初始评审 DAG
-  → loop: wave 并行 → 同步等待 → 汇总
+  → loop:
+      取就绪 wave → 并行派子代理 → 同步等待 → 更新 node_status
       → review-ready? ─是→ Review Closure 表 → 结束
-      → not-ready? ─→ 重编排 dag_version++ → 继续
+      → not-ready? ─→ 重编排（dag_version++）→ 继续
 ```
+
+同一 must-fix 震荡 ≥3 次 → **blocked**，请用户拍板。
 
 **diff**：单轮 **diff** 评审（见 diff prompt，非 review-full 循环）+ cleanup-check（可选），无 loop；结论三态；需改则用户决定是否进入 fix loop。
 
@@ -181,10 +193,24 @@ P0/P1 必须 0 才 ready；P2 可列建议。
 
 ## Step 2：波次执行
 
-- review*：readonly + 本 skill + 模式 + PRD/spec 路径
-- fix：闭合 must-fix（须引用来源 review 节点 id / must-fix id）
-- verify：相关测试/build
-- cleanup-check：K 节
+1. 当前 wave **全部**节点 **并行**派发 Task 子代理
+2. **同步等待** 全部返回后再汇总
+3. 任一 fail / review* not ready → **not-ready**
+
+各节点 prompt 要点：
+
+- **review***：readonly + 本 skill + 模式 + PRD/spec 路径
+- **fix**：闭合 must-fix（须引用来源 review 节点 id / must-fix id）
+- **verify**：相关测试/build
+- **cleanup-check**：K 节
+
+---
+
+## 失败处理
+
+- 子代理失败：**重试一次**
+- 仍失败 → **not-ready**，主代理重编排 DAG 或标注 **blocked**
+- 同一 must-fix 震荡 ≥3 次 → **blocked**，请用户拍板
 
 ---
 
@@ -240,15 +266,30 @@ BASE_SHA / HEAD_SHA：<sha>
 ### fix
 
 ```text
-【语言要求】全程中文
+【语言要求】
+- 全程使用中文：任务说明、过程、结论、返回报告
+- 代码注释与公开 API 文档注释须中文；commit message 中文
+- 标识符、协议字段、第三方 API 名保持英文
 
-节点：fix-<id>。来源 review：<review_node_id>
-仓库：<PATH>。Bundle-delta：<YAML>
+节点：fix-<id>，类型：fix
+来源 review：<review_node_id>
+仓库/worktree：<PATH>
+分支：<BRANCH>
+Spec / PRD：<路径>
+Context Bundle（delta）：
+<粘贴 delta YAML>
 must-fix：<列表>
 
-inline 闭合 must-fix；跑相关测试；中文 commit。
+任务：闭合 must-fix 列表
+约束：
+- 单次 inline 连续执行；按逻辑块提交；不 revert 无关改动
+- 跑与改动相关的测试/build；记录命令与结果
 
-返回：1）已闭合项 2）提交 sha+message 3）验证结果 4）未闭合项
+请用中文按下列结构返回：
+1）已完成项与剩余缺口
+2）提交记录（sha + message，无则写「无提交」）
+3）验证命令及通过/失败
+4）阻塞项（如有）
 ```
 
 ### verify
@@ -342,7 +383,9 @@ Diff 范围：
 ## 执行检查清单
 
 - [ ] 已读 PRD + spec（或用户指定的评审范围）
-- [ ] review readonly，非自审
-- [ ] not-ready 已重编排 DAG
+- [ ] review* 已派 readonly 子代理，主代理未自审
+- [ ] fix / verify / cleanup-check 均已派 Task 子代理
+- [ ] 主代理未自改代码、未自跑 lint/test 替代子代理
+- [ ] not-ready 已重编排 DAG（`wave_plan` 更新 + `dag_version++`）
 - [ ] fix 后已重跑 review
 - [ ] manual_user 未误标阻塞
