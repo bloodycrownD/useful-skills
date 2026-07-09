@@ -48,7 +48,22 @@ disable-model-invocation: true
 ### func vs full（增量策略）
 
 - **func**：只查 **A（需求符合性-本波次范围）+ G（测试/verify）+ spec_deviations**
-- **full**：查 **B–K 全维**；若上下文表明相关模块已通过 func 小检且 HEAD 未超出该范围，**A/G 可抽检**，重点查 B–K
+- **full**：查 **B–K 全维**（含 **C-orch**）；若上下文表明相关模块已通过 func 小检且 HEAD 未超出该范围，**A/G 可抽检**，重点查 B–K
+
+### 编排收敛（C-orch）
+
+**编排收敛（Orchestration Consolidation）**：对**同一条业务事务**，减少**平行路径、多余转手、分散的协调点**，使「谁发起、谁推进、谁收尾」可读、可测、可单点修改；**不改变**对外可观察行为。
+
+**不是**把 `A → … → Z` 一律压成 `A → Z`。须区分：
+
+| 类型 | 说明 | 评审态度 |
+|------|------|----------|
+| **必要 hop** | 平台边界（IPC/沙箱）、序列化 DTO、性能合批、清晰的分层职责 | 保留；须在注释或 spec 写明「为何不能扁平」 |
+| **偶然 hop** | 平行装配入口、无事务语义的 ref/Map 透传、同语义多信号混用、死通道、第 N 份 unwrap | **收敛目标** |
+
+与 **DRY** 区分：DRY 反对**同一条知识**写多遍；C-orch 反对**同一件事走多条路径**、状态在函数间**抛来抛去**（路径重复 ≠ 代码行重复）。
+
+**适用**：多文件协调、状态机、跨端入口、flush/pipeline、生命周期递减等改动。**不适用**时标注 **N/A**（纯样式、单函数算法、无跨函数事务）。
 
 ---
 
@@ -121,7 +136,7 @@ review-scope-*（并行 wave）
 
 末轮全局节点类型为 **review-full**；**review-ready** 为 DAG 终点结论，不单独派遣子代理。
 
-**scope** 检查维度：A（本 scope）+ B/C（本 scope 文件）+ G（本 scope 测试）；不含全局 DRY/K（留 full）。
+**scope** 检查维度：A（本 scope）+ B/C/**C-orch**（本 scope 文件）+ G（本 scope 测试）；不含全局 DRY/K（留 full）。
 
 ---
 
@@ -140,6 +155,18 @@ review-scope-*（并行 wave）
 **B.** 正确性 — 边界、错误处理、资源释放、类型契约
 
 **C.** 质量 — 风格、**DRY**、命名、复杂度、职责、死代码
+
+**C-orch. 编排收敛**（多文件/跨端协调改动时适用，否则 **N/A**；见「关键术语 · 编排收敛」）
+
+| 检查项 | 严重度参考 |
+|--------|------------|
+| **平行入口**：新增第 N 条装配/旁路（如复制 `createAgentRunner`、绕过官方 turn 管线）且无 parity 测试 | P1；易致行为分叉可升 **P0** |
+| **无意中间态**：新 ref/Map/队列仅透传、无明确事务阶段语义 | P1 |
+| **信号混用**：同屏/同流程对「是否在跑」等语义多源消费且无映射表或文档 | P1；已致双减/竞态可升 **P0** |
+| **假扁平化**：为减层数破坏平台边界（沙箱/IPC）、事务边界或 spec 明示的编排阶段 | **P0** |
+| **收敛无证据**：合并编排链但无相关测试、T-xx 或 PRD 验收 id 覆盖 | P1 |
+
+与 **A**：PRD/spec 若写明「单点装配」「编排单入口」等，未满足 → **A + C-orch** 同时记 must-fix。与 **G**：parity/集成测为编排收敛的**门禁证据**。
 
 **D.** 安全 — 注入、鉴权、密钥、输入校验（适用时）
 
@@ -254,11 +281,12 @@ readonly 评审。skill：code-review-loop。模式：<scope|full>
 Spec / PRD：<路径>
 BASE_SHA / HEAD_SHA：<sha>
 节点 id：<review-scope-x | review-full>
-检查维度：<scope: A+B+C+G | full: B–K，A/G 增量见 skill>
+检查维度：<scope: A+B+C+C-orch+G | full: B–K（含 C-orch），A/G 增量见 skill>
+C-orch：多文件协调改动时必查；纯局部改动标 N/A 并简述理由。
 
 请用中文返回：
 1）相对上轮：已修复 / 仍开放（第 2 轮起）
-2）must-fix（id, P0|P1|P2, 文件, 描述, 维度）
+2）must-fix（id, P0|P1|P2, 文件, 描述, 维度；含 C-orch 时注明检查项）
 3）spec_deviations
 4）结论：scope-ready|review-ready: yes|no + 理由
 ```
@@ -344,7 +372,7 @@ Diff 范围：
 - BASE_SHA / HEAD_SHA：<sha>（或 PR #<n> / compare URL）
 - 变更文件：<FILES 或 git diff --name-only 输出>
 
-检查维度：B–K 全维，范围**限定于 diff**；A 对照 PRD/spec（若提供）与 diff 内变更点。
+检查维度：B–K 全维（含 **C-orch**，多文件协调改动时必查），范围**限定于 diff**；A 对照 PRD/spec（若提供）与 diff 内变更点。
 
 与 review-full 区别：diff 单轮、只评 diff 范围、结论**三态**（非 scope-ready/review-ready 循环）。
 
@@ -369,6 +397,7 @@ Diff 范围：
 | P0 / P1 | 0 / 0 |
 | K 节 | ✅/❌ |
 | spec_deviations | none / open: [...] |
+| C-orch | ✅/N/A（多文件协调改动时须 ✅） |
 | C 类合并后 QA | （可不空，不阻塞） |
 ```
 
@@ -389,3 +418,4 @@ Diff 范围：
 - [ ] not-ready 已重编排 DAG（`wave_plan` 更新 + `dag_version++`）
 - [ ] fix 后已重跑 review
 - [ ] manual_user 未误标阻塞
+- [ ] 多文件协调改动已查 **C-orch**；不适用处已标 N/A
