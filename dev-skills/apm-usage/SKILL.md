@@ -1,6 +1,6 @@
 ---
 name: apm-usage
-description: 指导 Agent 与开发者使用 APM CLI（init、read、role/persist/dynamic、kb 导入/索引/联想区、replace 局部更新、validate 干跑、heredoc/stdin 多行写入）。在用户提到 apm、外置记忆、.apm、apm read、知识库、会话恢复或 Agent 初始化上下文时使用。
+description: APM CLI 与外置记忆语义规范：persist（跨会话规则，类 AGENTS.md）、dynamic（背景/目的/现状）、role、kb、read/write/replace/validate。在提到 apm、.apm、外置记忆、会话恢复，或其它 skill 需更新 dynamic/persist 时使用。本文件为记忆「写什么」的唯一权威；其它 skill 不得另立字段表。
 disable-model-invocation: true
 ---
 
@@ -13,19 +13,99 @@ apm init
 apm read                         # 会话开始必做
 # … 执行任务 …
 
-# 多行写入（推荐 heredoc + --stdin）
+# 多行写入（推荐 heredoc + --stdin）；dynamic 须含 背景/目的/现状
 cat <<'EOF' | apm dynamic validate --stdin   # 可选：写入前干跑
-任务：…
-下一步：…
+## 背景
+…
+
+## 目的
+…
+
+## 现状
+…
 EOF
 cat <<'EOF' | apm dynamic write --stdin
-任务：…
-下一步：…
+## 背景
+…
+
+## 目的
+…
+
+## 现状
+…
 EOF
 ```
 
 - 在**项目根目录**（将创建或使用 `.apm/`）执行。
 - 入口：`apm`（项目内通常需先 `npm run build` 或全局安装）。
+
+---
+
+## 记忆语义（权威规范）
+
+其它 dev-skill 更新 `dynamic` / `persist` 时 **一律遵守本节**；不得再自造「阶段字段表」覆盖本节。CLI 细节见后文。
+
+### 三段分工
+
+| 段 | 是什么 | 不是什么 |
+|----|--------|----------|
+| **role** | Agent 身份/口吻 | 任务进度 |
+| **persist** | 跨会话仍有效的**持久规则**，写法接近 `AGENTS.md`：约定、边界、已拍板决策、踩坑后的行为约束 | 当前任务进度、DAG、探索流水、验证日志 |
+| **dynamic** | **当前任务**的工作记忆；固定用「背景 / 目的 / 现状」三节 | 机器状态库、节点表、wave 计划全文 |
+
+### `dynamic`：背景 · 目的 · 现状
+
+每次 `dynamic write` 用**全量覆盖**，正文须含这三节（可用 `##` 标题）：
+
+```markdown
+## 背景
+用户原话/命令摘要；相关 PRD/SPEC（或需求）路径；为何开这个任务。
+
+## 目的
+本轮要交付什么；验收大致长什么样；当前阶段终点（如「PRD 待确认」「dev-ready」）。
+
+## 现状
+做到哪了；卡在哪；解决思路与下一步（人话，短句即可）。
+```
+
+| 宜写入 | 不宜写入 |
+|--------|----------|
+| 用户指令要点、任务目标、关键文档路径 | DAG 节点表 / 边 / `wave_plan` / `dag_version` / `node_status` |
+| 当前阶段结论一句话、阻塞原因、下一步思路 | 探索报告全文、verify 命令流水、commit 列表 |
+| 确认态可用一句写在「现状」（如「用户已确认 spec」） | 把 `prd_confirmed` 等当 schema 堆字段 |
+
+阶段推进时：**重写三节**（或 `replace` 只改过时段落），不要把过程日志往下追加。
+
+### `persist`：持久规则（类 AGENTS.md）
+
+只写**换会话仍该遵守**的内容，例如：
+
+- 项目术语、模块边界、命名约定
+- 用户拍板且跨任务仍有效的决策（「X 模块不负责 Y」）
+- 协作/实现约束（「blocking 步骤必须有对应测试 id」）
+
+**不要**把「本迭代做到哪一步」「某次 verify 过了没」写进 persist。路径类信息若只服务当前任务，放 `dynamic`「背景」即可；仅当路径已成为团队约定时才进 persist。
+
+有新规则用 `write` 全量整理或 `replace` 补一条；无新规则则**本阶段可不碰 persist**。
+
+### 机器状态放哪（禁止塞进记忆槽）
+
+下列内容属于**工作流状态**，写到 Context Bundle、`docs/.iteration-state.yaml`、对话内 YAML，或 kb 文档——**不要**写入 `dynamic` / `persist`：
+
+- 开发 / 审查 DAG：`wave_plan`、节点表、边、`dag_version`、`node_status`
+- 轮次计数、open must-fix 清单、doc_fix_plan
+- Bundle-full / Bundle-delta 大段 YAML
+- 探索报告原文、验证输出原文
+
+`apm read` 的记忆槽给**人读、接续任务**用；状态机给编排逻辑用。二者分开。
+
+### 与其它 skill 的关系
+
+- 本文件 = `dynamic` / `persist` **写什么**的唯一权威。
+- 其它 skill 阶段结束时：按本节刷新 `dynamic` 三节；**仅当**出现可跨会话复用的规则时才更新 `persist`。
+- 无 APM 时：可用 `docs/.iteration-state.yaml` 或对话内等价维护「背景 / 目的 / 现状」与规则条文，语义相同。
+
+---
 
 ## Agent 写入正文：多行优先 heredoc + `--stdin`
 
@@ -42,10 +122,16 @@ EOF
 - **无 `--file` 参数**：长文档写 `kb/docs/` 路径（heredoc 或重定向 stdin），或用 Agent 写文件工具后 `apm kb index rebuild`。
 
 ```bash
-# bash：多行 dynamic（Agent 首选）
+# bash：多行 dynamic（Agent 首选；须含 背景/目的/现状）
 cat <<'EOF' | apm dynamic write --stdin
-任务：实现 foo
-下一步：补测试
+## 背景
+用户要求实现 foo；SPEC：Iterations/foo/spec.md
+
+## 目的
+按 spec 完成 foo 并跑通相关测试。
+
+## 现状
+核心逻辑已合入；下一步补单元测试。
 EOF
 
 # bash：写入前干跑（同一正文先 validate 再 write）
@@ -58,8 +144,12 @@ apm kb write --path Iterations/foo/prd.md --stdin < prd.md
 
 # PowerShell：here-string（多行、含中文）
 @'
-任务：实现 foo
-下一步：补测试
+## 背景
+…
+## 目的
+…
+## 现状
+…
 '@ | apm dynamic write --stdin
 
 # PowerShell：从 UTF-8 文件读入
@@ -73,8 +163,8 @@ Get-Content .\prd.md -Raw -Encoding UTF8 | apm kb write --path Iterations/foo/pr
 .apm/
   config.json          # 各段 max 上限；initializedAt / updatedAt / lastReadAt
   memory/role.md       # 角色
-  memory/persist.md    # 持久记忆
-  memory/dynamic.md    # 动态记忆（当前任务）
+  memory/persist.md    # 持久规则（类 AGENTS.md）
+  memory/dynamic.md    # 当前任务：背景 / 目的 / 现状
   kb/docs/             # 知识库 .md（可嵌套）
   kb/dynamic/detail.md
   kb/archive/          # memory 三段 write 时写入的分层快照（见下文）
@@ -202,16 +292,24 @@ apm config set --section role|persist|dynamicDetail|kbDynamicDetail --max <n>
 
 ## 典型场景
 
-**恢复会话：** `apm read` → 读动态记忆与联想区 → 继续任务。
+**恢复会话：** `apm read` → 读 `persist`（规则）与 `dynamic`（背景/目的/现状）及联想区 → 按「现状」继续；勿把 archive / Bundle 当记忆正文重写一遍。
 
-**切换任务（多行，heredoc）：**
+**切换或推进任务（重写 dynamic 三节）：**
 
 ```bash
 cat <<'EOF' | apm dynamic write --stdin
-任务：…
-下一步：…
+## 背景
+…
+
+## 目的
+…
+
+## 现状
+…
 EOF
 ```
+
+**写入跨会话规则（persist）：** 仅在有新约定/拍板决策时；正文宜短、像规则列表，勿贴任务流水。
 
 **写入知识库单文件：**
 
@@ -227,11 +325,21 @@ apm read
 
 ```bash
 cat <<'EOF' | apm dynamic validate --stdin
-草稿
+## 背景
+…
+## 目的
+…
+## 现状
+…
 EOF
 # OK: n/max 后再 write（同一 heredoc 正文）
 cat <<'EOF' | apm dynamic write --stdin
-草稿
+## 背景
+…
+## 目的
+…
+## 现状
+…
 EOF
 ```
 

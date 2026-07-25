@@ -18,19 +18,19 @@ disable-model-invocation: true
 
 1. 先读取需求文档：
    - 默认：`.apm/kb/docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；若 `dependency` 非空，一并读取所列前置 PRD
-   - **非标准输入**（用户口述、自定义路径）：以用户指定路径为准；`dynamic` 记录 `requirement_path`（口述时可记「用户口述」或等价说明）
+   - **非标准输入**（用户口述、自定义路径）：以用户指定路径为准；`dynamic`「背景」记录需求路径（口述时可记「用户口述」）
    - **APM 可用时**：`apm read` + `apm kb search --q "<需求名称/关键词>"` 检索相关历史方案与上下文（仅此步可由主代理直接做）
    - **无 APM 环境**：直读 `.apm/kb/docs/...` 或 `requirement_path`
-   - **阶段完成**：更新 `dynamic`（需求名称、`requirement_path`、设计任务状态）与 `persist`（需求名称、`requirement_path`）
+   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（背景含需求路径；目的=产出可确认的 spec）
 2. **在生成 `spec.md` 之前，必须先完成代码探索**（不可跳过）：
    - 主代理基于需求文档（`requirement_path`）列出可能涉及的文件、模块、接口，并用 `apm kb search`（或直读 kb）补充检索相关 spec、变更记录与模块文档（仅此步可由主代理直接做）
    - **深入阅读代码、确认实现与约束须派遣多个子代理**（见「探索阶段」），主代理 **不得** 自行深入读代码、扫目录替代子代理
    - 主代理根据各子代理返回的 **探索报告** 汇总：影响范围、兼容性风险、技术边界、关键模块映射
-   - **阶段完成**：更新 `dynamic`（探索报告摘要、影响范围、待设计项）与 `persist`（现状约束、关键模块映射）
+   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`「现状」；可跨会话复用的约束/模块边界写入 `persist`
 3. 完成代码探索后，再生成方案文档并写入知识库：
    - `.apm/kb/docs/Iterations/<需求名称>/spec.md`
    - **APM 可用时**写完后执行 `apm kb index rebuild`；无 APM 时直写文件即可
-   - **阶段完成**：更新 `dynamic`（spec 路径、状态「待用户确认」）与 `persist`（spec 路径、核心方案要点、主要风险）
+   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（现状含 spec 路径与「待用户确认」）
 4. `spec.md` 须符合「文档格式规范」（YAML Front Matter + 正文），且必须基于真实代码上下文，不允许只依据需求文本做“空中方案”。
 5. SPEC 正文必须面向实现，至少包含：
    - 总体实现思路与架构
@@ -47,7 +47,7 @@ disable-model-invocation: true
    - 测试用例 id 格式 `T-<模块缩写><序号>`（如 `T-W1`）；每条 T 须能映射到至少一个 Step
    - `blocking: yes`：该步骤为交付硬门槛
    - `qa: manual_user`：真机/录屏等，标注为合并后用户验收，**不**作为自动门禁阻塞项
-8. 落盘后请求用户确认 `spec.md`；**确认后**：更新 `dynamic`（状态「已完成」、`spec_draft_confirmed: yes`）与 `persist`（已确认的方案要点）。
+8. 落盘后请求用户确认 `spec.md`；**确认后**：按 `apm-usage` 刷新 `dynamic`「现状」（已确认）；已拍板且跨任务仍有效的方案要点可写入 `persist`。
 9. 探索报告摘要可写入 **Context Bundle**（见下），供后续实现参考；**探索不构成跳过 impl 子代理的依据**。
 
 ## 探索阶段（生成 spec 之前必做）
@@ -70,7 +70,7 @@ disable-model-invocation: true
 | 工具 | `Task`，`subagent_type: explore` |
 | readonly | **true** |
 | 并行 | 2–4 个，同步等待 |
-| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，dynamic 记录 |
+| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，写入 `dynamic`「现状」 |
 
 ### 主代理禁止
 
@@ -114,7 +114,7 @@ disable-model-invocation: true
 禁止修改任何文件。
 ```
 
-探索报告摘要写入 `dynamic` / `persist`；`spec.md` 中的变更点与实现步骤须能追溯到探索报告中的证据。
+探索报告摘要写入 Context Bundle 与 `dynamic`「现状」（人话短句，勿贴全文）；`spec.md` 中的变更点与实现步骤须能追溯到探索报告中的证据。`persist` 仅记可跨会话复用的约束/边界。详见 `apm-usage`。
 
 ## Context Bundle（可选，供后续实现参考）
 
@@ -132,37 +132,28 @@ blocking_steps: [...]
 
 ## 阶段记忆更新
 
-每阶段结束后执行（多行正文用 heredoc 管道：`cat <<'EOF' | apm dynamic write --stdin`；persist 同理；`replace` 更新过时条目；短句可用 `--text`）：
+遵守 **`apm-usage`「记忆语义」**。每阶段结束重写 `dynamic` 三节；仅当有新跨会话规则时改 `persist`。勿自造字段表，勿把探索/验证流水堆进记忆。
 
-| 阶段 | dynamic（当前任务） | persist（跨会话结论） |
-|------|---------------------|---------------------|
-| 需求读取 | 需求名称、`requirement_path`、设计任务状态 | `requirement_path` |
-| 探索完成 | 探索报告摘要、影响范围、技术约束、待设计方案 | 现状约束、关键模块与接口映射 |
-| spec 落盘 | spec 路径、待确认项 | spec 路径、核心方案要点、主要风险 |
-| 用户确认 | 状态「已完成」、`spec_draft_confirmed: yes` | 已确认的方案要点 |
-
-- `dynamic`：全量覆盖当前任务进度与下一步。
-- `persist`：仅写入已确认、可长期复用的结论；避免堆砌过程细节。
-- **无 APM 环境**：`dynamic` / `persist` 可写入 `docs/.iteration-state.yaml`（或用户指定路径），或在对话内用 YAML 块等价维护；字段含义与上表一致。
+- **无 APM 环境**：可用 `docs/.iteration-state.yaml` 或对话内等价维护，语义相同。
 
 ## 环境与工具 fallback
 
-- **无 APM 环境**：知识库直读 `.apm/kb/docs/...` 或 `requirement_path`；spec 落盘直写等价路径；`dynamic` / `persist` 见「阶段记忆更新」
+- **无 APM 环境**：知识库直读 `.apm/kb/docs/...` 或 `requirement_path`；spec 落盘直写等价路径；记忆见「阶段记忆更新」与 `apm-usage`
 - 下列 **`apm` 命令仅在 APM 可用时执行**；不可用时以读/写文件与 `docs/.iteration-state.yaml`（或对话内状态）为准
 
 ## 执行检查清单（每次都要走完）
 
 - [ ] 已读取需求文档（默认 `prd.md` 或 `requirement_path`）；标准 PRD 时已校验 Front Matter 并读取 `dependency` 所列前置 PRD（如有）
 - [ ] **APM 可用时**已 `apm read` / `apm kb search`（不可用时已直读 kb 或 `requirement_path`）
-- [ ] 需求读取后已更新 `dynamic` 与 `persist`（含 `requirement_path`）
+- [ ] 需求读取后已按 `apm-usage` 更新 `dynamic`
 - [ ] 已派遣多个 readonly 探索子代理并 **同步等待** 全部探索报告
 - [ ] 主代理已汇总探索报告（影响范围、现状约束、关键模块映射；非主代理直接读代码）
-- [ ] 探索后已更新 `dynamic` 与 `persist`
+- [ ] 探索后已按 `apm-usage` 更新记忆
 - [ ] 已在方案中体现现状约束与影响分析
 - [ ] 已生成 `.apm/kb/docs/Iterations/<需求名称>/spec.md`（含 YAML Front Matter：`date`）；**APM 可用时**已 `apm kb index rebuild`
-- [ ] spec 落盘后已更新 `dynamic` 与 `persist`
+- [ ] spec 落盘后已按 `apm-usage` 更新 `dynamic`
 - [ ] 已请求用户确认 `spec.md`
-- [ ] 用户确认后已更新 `dynamic` 与 `persist`
+- [ ] 用户确认后已刷新 `dynamic`「现状」（及必要时 `persist`）
 
 ## 文档格式规范
 

@@ -38,7 +38,7 @@ disable-model-invocation: true
 
 一次完整的：**子代理 readonly 审查 → 主代理汇总 →（若未 ready）派遣 doc-fix 子代理并同步等待 → 下一轮**。
 
-轮次从 1 开始；`dynamic` 记录当前轮次与上轮 must-fix 闭合情况。
+轮次从 1 开始；当前轮次与上轮 must-fix 闭合情况写在 **iteration-state**，`dynamic`「现状」只用一两句人话概括。
 
 ### 同步等待
 
@@ -80,9 +80,11 @@ doc_fix_plan: [[spec-§3], [prd-验收, spec-测试]]  # wave 计划；完成后
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | execute-ready 已确认
 ```
 
+上表落在 iteration-state / 对话 YAML，**不是** `apm dynamic` 正文。记忆写法见 `apm-usage`。
+
 **禁止**：No-Go 后只改一处不更新 `doc_fix_plan` / `dag_version` / 不进入下轮审查。
 
-无 APM 时：用 `docs/.iteration-state.yaml` 或对话内 YAML 块等价维护。
+无 APM 时：用 `docs/.iteration-state.yaml` 或对话内 YAML 块等价维护**编排状态**；`dynamic` 仍按「背景 / 目的 / 现状」维护（可无 APM 时写在同一文件旁白或对话内）。
 
 ---
 
@@ -93,7 +95,7 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 - 若项目使用 APM：`apm read` + `apm kb search --q "<关键词>"`（workspace 不完整时仍可手工读 `.apm/kb/docs/...`）
 - **不要求**工作区干净（本阶段只改文档）；若同时改代码则偏离本 skill
 
-**准备完成**：更新 `dynamic`（PRD/SPEC 路径、轮次 0、状态「待首轮审查」）与 `persist`（迭代名、文档路径）。
+**准备完成**：按 `apm-usage` 刷新 `dynamic`（背景=文档路径与用户意图；目的=达 execute-ready；现状=待首轮审查）。编排状态写入 iteration-state，勿塞进记忆槽。
 
 ---
 
@@ -238,7 +240,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - 大改契约时检查 `dependency` 前置 PRD 是否需同步一句
 - 若修改了 kb 内 PRD/SPEC 且 APM 可用：执行 `apm kb index rebuild`
 
-**修复完成**：主代理更新 `dynamic`（轮次、上轮 must-fix 闭合列表、状态「待下轮审查」）与 `persist`（已拍板契约要点、仍开放 P1）。
+**修复完成**：主代理更新 iteration-state（轮次、闭合列表）；按 `apm-usage` 刷新 `dynamic`「现状」。已拍板且跨任务仍有效的契约可写入 `persist`。
 
 ---
 
@@ -261,7 +263,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - 「接受某 P1 风险开工」→ 写入 SPEC 后可为 ready，须用户显式说
 - 「停止循环」→ 汇报当前 No-Go 项后结束
 
-**用户确认 execute-ready 后**：更新 `dynamic`（状态「execute-ready 已确认」、`execute_ready_confirmed: yes`）与 `persist`（已确认要点）。
+**用户确认 execute-ready 后**：按 `apm-usage` 刷新 `dynamic`「现状」（execute-ready 已确认）；已确认要点若跨任务仍有效可写入 `persist`。
 
 ---
 
@@ -277,13 +279,7 @@ must-fix 清单（须在本 wave 内闭合）：
 
 ## 阶段记忆更新（APM）
 
-| 阶段 | dynamic | persist |
-|------|---------|---------|
-| 准备 | PRD/SPEC 路径、轮次 0 | 迭代名、文档路径 |
-| 每轮审查后 | 轮次、P0/P1 计数、Go/No-Go | must-fix 摘要 |
-| 文档修复后 | 状态「待下轮审查」、已闭合 P0 | 已拍板契约 |
-| execute-ready | 状态「待用户确认」 | 核心方案要点 |
-| 用户确认 | 状态「execute-ready 已确认」、`execute_ready_confirmed: yes` | 已确认要点 |
+遵守 **`apm-usage`「记忆语义」**。轮次、`doc_fix_plan`、must-fix 清单属编排状态，写 iteration-state；`dynamic` 只用背景 / 目的 / 现状描述当前任务。勿自造字段表。
 
 ---
 
@@ -294,7 +290,7 @@ must-fix 清单（须在本 wave 内闭合）：
 **doc-fix 子代理失败**（超时、资源）：
 
 1. 短暂停顿后重试一次
-2. 仍失败：主代理可手工完成 doc-fix，但须同样闭合 must-fix 并记录于 dynamic，标注「手工 doc-fix」
+2. 仍失败：主代理可手工完成 doc-fix，但须同样闭合 must-fix，并在 `dynamic`「现状」注明「手工 doc-fix」
 3. 资源恢复后优先回到子代理流程
 
 **多轮震荡**（同一 P0 反复出现）：停止自动循环，请用户拍板二选一写进 SPEC。
@@ -309,13 +305,13 @@ must-fix 清单（须在本 wave 内闭合）：
 - [ ] not-ready 时已派 doc-fix 子代理并 **同步等待**（非主代理直改）
 - [ ] P0 闭合后才可宣称 execute-ready
 - [ ] 未在用户确认前开始编码
-- [ ] 已更新 dynamic / persist（若 APM 可用）
+- [ ] 已按 `apm-usage` 更新 `dynamic`（及必要时 `persist`）
 
 ---
 
 ## 完成产出（execute-ready 后）
 
-用户确认后，在 dynamic 中保留可供后续使用的素材（用户或后续任务自行取用，本 skill 不强制指定下游步骤）：
+用户确认后，在 **Context Bundle / iteration-state** 保留可供后续使用的素材（用户或后续任务自行取用，本 skill 不强制指定下游步骤）；`dynamic`「现状」用一两句指向这些路径即可，勿把整段 YAML 贴进记忆：
 
 ```yaml
 spec_path: ...

@@ -19,7 +19,7 @@ disable-model-invocation: true
    - **无 APM 环境**：直接读取 `.apm/kb/docs/...` 或用户指定路径下的已有 PRD/文档；检索不足时向用户索取路径
    - **探索代码与业务现状须派遣多个子代理**（见「探索阶段」），主代理 **不得** 自行深入读代码、扫目录替代子代理
    - 主代理根据各子代理返回的 **探索报告** 汇总「现状摘要」：已有能力、缺口、可能影响范围（仅业务视角，不写技术方案）
-   - **阶段完成**：更新 `dynamic`（探索报告摘要、现状摘要、待澄清问题）与 `persist`（已确认的项目术语、既有能力边界）
+   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（背景/目的/现状）；仅当有新跨会话规则（术语、能力边界等）时更新 `persist`
 2. 完成探索后，使用 `AskQuestion` 与用户澄清需求细节：
    - 问题须基于探索结论，引用具体模块/流程/界面，避免空泛提问
    - 每次只问一个聚焦问题，直到关键信息明确：
@@ -33,12 +33,12 @@ disable-model-invocation: true
      - 用户明确表示叫停或无需继续追问
      - 剩余缺口已写入 PRD「风险与待确认项」（或扩展章节等价位置），可带缺口进入落盘
    - **`AskQuestion` 不可用时**：在回复中只提**一个**聚焦问题，等用户回答后再继续下一轮澄清（规则同上）
-   - **阶段完成**：更新 `dynamic`（已澄清项、待确认项、下一步）与 `persist`（用户已确认的关键决策）
+   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`；用户拍板且跨任务仍有效的决策可写入 `persist`
 3. 澄清完成后，生成 PRD 并写入 APM 知识库：
    - `.apm/kb/docs/Iterations/<需求名称>/prd.md`
    - 多行可用 heredoc：`cat <<'EOF' | apm kb write --path Iterations/<需求名称>/prd.md --stdin`（见 `apm-usage`），或直接写文件
    - **APM 可用时**写完后执行 `apm kb index rebuild`（便于 `apm read` 联想检索）；无 APM 时直写文件即可
-   - **阶段完成**：更新 `dynamic`（PRD 路径、状态「待用户确认」）与 `persist`（需求名称、PRD 路径、核心范围与验收要点）
+   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（目的/现状含 PRD 路径与「待用户确认」）
 4. `prd.md` 须符合「文档格式规范」（YAML Front Matter + 正文），默认输出轻量 PRD，正文至少包含：
    - 背景（含与现状的关系）
    - 目标（含成功指标）
@@ -48,7 +48,7 @@ disable-model-invocation: true
    - 验收标准
 5. 验收标准必须可测试、可判定，优先使用清单或 Given / When / Then 表达。
 6. 明确告知生成路径，并请用户进行最终确认。
-   - **用户确认 PRD 后**：更新 `dynamic`（`prd_confirmed: yes`、阶段状态「已完成」）
+   - **用户确认 PRD 后**：按 `apm-usage` 刷新 `dynamic`「现状」（已确认）；无新规则则不动 `persist`
 7. 明确边界：本 skill 只输出 PRD，不展开技术方案、接口设计、数据库结构、任务拆分等技术 spec 内容。
 8. 如用户明确需要，再按需追加「扩展章节」（非默认）：
    - 约束与依赖
@@ -74,7 +74,7 @@ disable-model-invocation: true
 | 工具 | `Task`，`subagent_type: explore` |
 | readonly | **true** |
 | 并行 | 2–4 个，同步等待 |
-| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，dynamic 记录 |
+| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，写入 `dynamic`「现状」 |
 
 ### 主代理禁止
 
@@ -118,26 +118,17 @@ disable-model-invocation: true
 禁止修改任何文件。
 ```
 
-探索产出不要求单独落盘为文件，但须在后续提问与 PRD「背景」中体现；摘要写入 `dynamic` / `persist`。
+探索产出不要求单独落盘为文件，但须在后续提问与 PRD「背景」中体现；人话摘要写入 `dynamic`「现状」（勿贴探索报告全文）。`persist` 仅在出现可跨会话复用的术语/边界规则时更新。详见 `apm-usage`。
 
 ## 阶段记忆更新
 
-每阶段结束后执行（多行正文用 heredoc 管道：`cat <<'EOF' | apm dynamic write --stdin`；persist 同理；`replace` 更新过时条目；短句可用 `--text`）：
+遵守 **`apm-usage`「记忆语义」**（唯一权威）。每阶段结束：重写 `dynamic` 的背景 / 目的 / 现状；**仅当**有新跨会话规则时改 `persist`。探索摘要、PRD 路径、确认态用一两句写在「现状」，勿自造字段表，勿把过程日志堆进记忆。
 
-| 阶段 | dynamic（当前任务） | persist（跨会话结论） |
-|------|---------------------|---------------------|
-| 探索完成 | 探索报告摘要、现状摘要、涉及模块、待澄清问题 | 项目术语、既有能力边界 |
-| 澄清完成 | 已确认目标/范围/指标、剩余缺口 | 用户已拍板的关键决策 |
-| PRD 落盘 | PRD 路径、阶段状态「待用户确认」 | 需求名称、PRD 路径、核心范围与验收要点 |
-| 用户确认 PRD | `prd_confirmed: yes`、阶段状态「已完成」 | （沿用 PRD 落盘时的 persist） |
-
-- `dynamic`：全量覆盖当前任务进度与下一步。
-- `persist`：仅写入已确认、可长期复用的结论；避免堆砌过程细节。
-- **无 APM 环境**：`dynamic` / `persist` 可写入 `docs/.iteration-state.yaml`（或用户指定路径），或在对话内用 YAML 块等价维护；字段含义与上表一致。
+- **无 APM 环境**：可用 `docs/.iteration-state.yaml` 或对话内等价维护三节与规则，语义相同。
 
 ## 环境与工具 fallback
 
-- **无 APM 环境**：知识库直读 `.apm/kb/docs/...` 或用户指定路径；PRD 落盘直写等价路径；`dynamic` / `persist` 见「阶段记忆更新」
+- **无 APM 环境**：知识库直读 `.apm/kb/docs/...` 或用户指定路径；PRD 落盘直写等价路径；记忆见「阶段记忆更新」与 `apm-usage`
 - 下列 **`apm` 命令仅在 APM 可用时执行**；不可用时以读/写文件与对话内状态为准
 
 ## 执行检查清单（每次都要走完）
@@ -145,13 +136,13 @@ disable-model-invocation: true
 - [ ] **APM 可用时**已执行 `apm read` 与 `apm kb search`（不可用时已直读 kb 路径或用户指定文档）
 - [ ] 已派遣多个 readonly 探索子代理并 **同步等待** 全部探索报告
 - [ ] 主代理已汇总探索报告并形成现状摘要（非主代理直接读代码）
-- [ ] 探索后已更新 `dynamic` 与 `persist`
+- [ ] 探索后已按 `apm-usage` 更新 `dynamic`（及必要时 `persist`）
 - [ ] 已基于探索结论澄清关键信息（优先 `AskQuestion`；不可用时在回复中单问并等待用户回答）
-- [ ] 澄清后已更新 `dynamic` 与 `persist`
+- [ ] 澄清后已按 `apm-usage` 更新记忆
 - [ ] 已生成 `.apm/kb/docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；**APM 可用时**已 `apm kb index rebuild`
-- [ ] PRD 落盘后已更新 `dynamic` 与 `persist`
+- [ ] PRD 落盘后已按 `apm-usage` 更新 `dynamic`
 - [ ] 已明确 PRD 路径并请用户最终确认
-- [ ] 用户确认后已更新 `dynamic`（`prd_confirmed: yes`、状态「已完成」）
+- [ ] 用户确认后已刷新 `dynamic`「现状」
 - [ ] 未输出技术 spec（接口设计、库表、任务拆分等）
 
 ## 文档格式规范（PRD）
