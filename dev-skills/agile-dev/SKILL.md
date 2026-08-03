@@ -49,12 +49,12 @@ disable-model-invocation: true
 
 | 产物 | 路径 |
 |------|------|
-| PRD | `.apm/kb/docs/Iterations/<需求名称>/bugs\|features/<敏捷名称>/prd.md` |
-| SPEC | `.apm/kb/docs/Iterations/<需求名称>/bugs\|features/<敏捷名称>/spec.md` |
+| PRD | `docs/Iterations/<需求名称>/bugs\|features/<敏捷名称>/prd.md` |
+| SPEC | `docs/Iterations/<需求名称>/bugs\|features/<敏捷名称>/spec.md` |
 
 - `<需求名称>`：所属迭代（与 `Iterations/` 下目录一致）；无法确定时询问用户
 - `<敏捷名称>`：简短 kebab-case 标识（如 `login-timeout-on-refresh`、`export-csv-button`）
-- 两个文档写完后均执行 `apm kb index rebuild`
+- 两个文档写完后均执行 `apm index build`
 
 ### 输入来源
 
@@ -67,8 +67,8 @@ disable-model-invocation: true
 
 1. 根据用户意图判定 **bug** 或 **feature**；含糊时只问**一个**聚焦问题
 2. 确定 `<需求名称>`、`<敏捷名称>`（kebab-case）
-3. 执行 `apm read`，`apm kb search --q "<关键词/需求名称>"`
-4. 读取父级 `.apm/kb/docs/Iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
+3. 执行 `apm read`（联想区会检索 docs/ 与 archive/）
+4. 读取父级 `docs/Iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
 5. **分支安全闸**：禁止在 `main` / `master` 直接改；工作区须干净
 
 **阶段完成**：按 `apm-usage` 刷新 `dynamic`（背景/目的/现状：类型、敏捷名称、父级路径等用人话写进三节）。
@@ -210,7 +210,7 @@ disable-model-invocation: true
 
 1. 写入 `bugs/<敏捷名称>/` 或 `features/<敏捷名称>/` 下的 **`prd.md`**（业务/现象/需求视角）
 2. 写入同目录 **`spec.md`**（技术/实现视角）
-3. 执行 `apm kb index rebuild`
+3. 执行 `apm index build`
 
 ### prd.md Front Matter
 
@@ -319,11 +319,11 @@ agile_trace: true
 ## 执行检查清单
 
 - [ ] 已判定 bug / feature，并确定需求名称与敏捷名称
-- [ ] 已读父级 PRD，`apm read` / `apm kb search`
+- [ ] 已读父级 PRD，`apm read`
 - [ ] 已派遣 readonly 探索子代理并同步等待；主代理已汇总探索结论
 - [ ] 已在非保护分支派子代理 inline 实现并同步等待
 - [ ] 针对性测试与 build 已通过
-- [ ] 已生成 `bugs|features/<敏捷名称>/prd.md` 与 `spec.md`（含 Front Matter）并已 `apm kb index rebuild`
+- [ ] 已生成 `bugs|features/<敏捷名称>/prd.md` 与 `spec.md`（含 Front Matter）并已 `apm index build`
 - [ ] 文档内容与真实改动一致，未编造
 - [ ] 已向用户说明并请确认；确认后已按 `apm-usage` 更新记忆
 

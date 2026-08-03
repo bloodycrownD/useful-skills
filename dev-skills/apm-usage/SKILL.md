@@ -1,6 +1,6 @@
 ---
 name: apm-usage
-description: APM CLI 与外置记忆语义规范：persist（跨会话规则，类 AGENTS.md）、dynamic（背景/目的/现状）、role、kb search/index、read/write/validate。在提到 apm、.apm、外置记忆、会话恢复，或其它 skill 需更新 dynamic/persist 时使用。本文件为记忆「写什么」的唯一权威；其它 skill 不得另立字段表。
+description: APM CLI 与外置记忆语义规范：persist（跨会话规则，类 AGENTS.md）、dynamic（背景/目的/现状）、role、index build、read/write/validate。在提到 apm、.apm、外置记忆、会话恢复，或其它 skill 需更新 dynamic/persist 时使用。本文件为记忆「写什么」的唯一权威；其它 skill 不得另立字段表。
 disable-model-invocation: true
 ---
 
@@ -40,7 +40,7 @@ EOF
 
 - 在**项目根目录**（将创建或使用 `.apm/`）执行。
 - 入口：`apm`（或 `npx apm`；源码仓库需先 `npm run build`）。
-- **工作区自动补齐**：任意命令首次执行时会创建或补全 `.apm/`；`apm init` 等价且幂等。废弃的 `.apm/dynamic/` 与 `kb/dynamic/` 若存在会被自动删除。
+- **工作区自动补齐**：任意命令首次执行时会创建或补全 `.apm/`；`apm init` 等价且幂等。
 
 ---
 
@@ -119,11 +119,11 @@ EOF
 | 已有文件作记忆正文 | 重定向或 `Get-Content -Raw -Encoding UTF8` 管道 |
 | 单行短句 | `--text "…"` |
 | 写入前检查长度 | 同样用 heredoc / 文件管道到 `validate --stdin` |
-| 知识库 `.md` | **直接写文件**到 `.apm/kb/docs/`，再 `apm kb index rebuild`（**无** `kb write` / `kb import`） |
+| 知识库 `.md` | **直接写文件**到项目根 `docs/`，再 `apm index build` |
 
 - **`write` / `validate` 均不强制 `--text`**；`--text` 与 `--stdin` **互斥**。
 - **不要**在 `--text` 里手工拼多行 `\n`；heredoc / here-string 传**真实换行**。
-- **无 `--file`、无 `replace`、无 `kb write`**。
+- **无 `--file`**。
 
 ```bash
 # bash：多行 dynamic（Agent 首选；须含 背景/目的/现状）
@@ -160,19 +160,17 @@ Get-Content .\draft.md -Raw -Encoding UTF8 | apm dynamic write --stdin
 ## 工作区
 
 ```
-.apm/
-  config.json          # 各段 max 上限；initializedAt / updatedAt / lastReadAt
-  memory/role.md       # 角色
-  memory/persist.md    # 持久规则（类 AGENTS.md）
-  memory/dynamic.md    # 当前任务：背景 / 目的 / 现状
-  kb/docs/             # 知识库 .md（可嵌套；直接写文件）
-  kb/archive/          # memory 三段 write 时写入的分层快照
-  kb/index/search.json.gz
+.apm/                    # 运行态目录（整体 .gitignore）
+  config/config.json     # 各段 max 上限；initializedAt / updatedAt / lastReadAt
+  config/index.gz        # 搜索索引（`apm index build` 产物）
+  memory/role.md         # 角色
+  memory/persist.md      # 持久规则（类 AGENTS.md）
+  memory/dynamic.md      # 当前任务：背景 / 目的 / 现状
+  archive/               # memory 三段 write 时写入的分层快照
+docs/                    # 项目根，知识库 .md（可嵌套；直接写文件，入版本控制）
 ```
 
-知识库文档写入 `.apm/kb/docs/`（如 `Iterations/foo/prd.md`），再 `apm kb index rebuild`。检索与联想中的路径相对 `kb/`（如 `docs/foo.md`、`archive/2026/06/18/dynamic/143052127.md`；旧版扁平 `archive/dynamic-….md` 仍可被索引）。
-
-**已废弃（存在则 CLI 自动删除）**：`.apm/dynamic/`、`.apm/kb/dynamic/`。
+知识库文档写入项目根 `docs/`（如 `Iterations/foo/prd.md`），再 `apm index build`。检索与联想中的路径带来源前缀（如 `docs/foo.md`、`archive/2026/06/18/dynamic/143052127.md`）。
 
 ## 默认长度上限（仅 max，无下限）
 
@@ -184,21 +182,21 @@ Get-Content .\draft.md -Raw -Encoding UTF8 | apm dynamic write --stdin
 
 - **无下限**：任意短文本（含 1 字、空串）均可写入。
 - **仅上限**：超过 `max` 时拒绝写入，报错含 `got n, max m, need k fewer chars`。
-- `kb/docs/` 下文件**不受**上述 max 限制（直接写文件，不经 CLI write）。
+- `docs/` 下文件**不受**上述 max 限制（直接写文件，不经 CLI write）。
 
 ## `apm read` 输出
 
 无内容的段会省略。顺序：
 
 1. `# 角色`、`# 持久记忆`、`# 动态记忆`（正文已去 YAML front matter）
-2. `# 联想区`（用三段记忆正文检索 `kb/`，不含 `index/`）
+2. `# 联想区`（用三段记忆正文检索 `docs/` 与 `.apm/archive/`）
 
 | 联想区 | 说明 |
 |--------|------|
 | 详细区 | ≤5 条；`[匹配率%] 路径 关键词：…` + ≤3 行 `行号\|正文`（超 120 字截断）；条间空一行 |
 | 简略区 | ≤10 条；仅头部；条间无空行；与详细区间空一行 |
 | 无命中 | 不输出联想区 |
-| 无索引 | 输出提示执行 `apm kb index rebuild` |
+| 无索引 | 输出提示执行 `apm index build` |
 
 ## 命令
 
@@ -243,11 +241,11 @@ apm role validate --text "短草稿"
 
 每次 `role` / `persist` / `dynamic` 的 **`write`** 会将**本次落盘全文**（含 YAML front matter）同时写入目标文件与分层 archive 快照；快照与目标文件**完全相同**（存新版，非覆盖前的旧版）。
 
-| 路径模式（相对 `kb/`） | 说明 |
+| 路径模式（相对 `.apm/archive/`） | 说明 |
 |------------------------|------|
-| `archive/{yyyy}/{MM}/{dd}/role/{HHmmssSSS}.md` | role write 快照 |
-| `archive/{yyyy}/{MM}/{dd}/persist/{HHmmssSSS}.md` | persist write 快照 |
-| `archive/{yyyy}/{MM}/{dd}/dynamic/{HHmmssSSS}.md` | dynamic write 快照 |
+| `{yyyy}/{MM}/{dd}/role/{HHmmssSSS}.md` | role write 快照 |
+| `{yyyy}/{MM}/{dd}/persist/{HHmmssSSS}.md` | persist write 快照 |
+| `{yyyy}/{MM}/{dd}/dynamic/{HHmmssSSS}.md` | dynamic write 快照 |
 
 | 命令 | archive 快照 |
 |------|--------------|
@@ -255,20 +253,20 @@ apm role validate --text "短草稿"
 | `dynamic write --text ""` | 目标变为空模板，仍 +1 条空模板快照 |
 | `validate` | **不**写盘、不归档 |
 
-### 知识库
+### 知识库与索引
 
 ```bash
-apm kb search --q "<查询>"
-apm kb index rebuild
+apm index build       # 扫描项目根 docs/ 与 .apm/archive/，重建 .apm/config/index.gz
 ```
 
-- **无** `kb write` / `kb import` / `kb dynamic`：知识库正文直接编辑/复制到 `.apm/kb/docs/**/*.md`，再 `rebuild`。
-- 可用 Agent 写文件工具落盘 PRD/SPEC，然后 `apm kb index rebuild`。
+- **无独立 search 命令**：检索结果通过 `apm read` 的联想区输出。
+- **无** `kb dynamic`：知识库正文直接编辑/复制到项目根 `docs/**/*.md`，再 `index build`。
+- 可用 Agent 写文件工具落盘 PRD/SPEC，然后 `apm index build`。
 
-| 操作 | 自动 `kb index rebuild` |
-|------|-------------------------|
+| 操作 | 自动 `index build` |
+|------|--------------------|
 | `role` / `persist` / `dynamic` 的 write | 是 |
-| 直接写入/移动 `kb/docs/` | 否（须手动 `rebuild`） |
+| 直接写入/移动 `docs/` | 否（须手动 `index build`） |
 | `validate`（各段） | 否 |
 
 ### 配置
@@ -278,7 +276,7 @@ apm config show
 apm config set --section role|persist|dynamicDetail --max <n>
 ```
 
-- 各段 limits **仅含 `max`**；旧 config 中的 `min`、`kbDynamicDetail` 已移除/忽略。
+- 各段 limits **仅含 `max`**。
 - `config set` 写回时只持久化 `{ "max": n }`。
 
 ## 典型场景
@@ -305,9 +303,9 @@ EOF
 **写入知识库单文件：**
 
 ```bash
-# 直接写到 .apm/kb/docs/（Agent 写文件工具或编辑器）
-# 例：.apm/kb/docs/Iterations/<名>/prd.md
-apm kb index rebuild
+# 直接写到项目根 docs/（Agent 写文件工具或编辑器）
+# 例：docs/Iterations/<名>/prd.md
+apm index build
 apm read
 ```
 
@@ -338,8 +336,8 @@ EOF
 | 路径 | 用途 |
 |------|------|
 | `.apm/memory/` | CLI 外置记忆，`apm read` 使用 |
-| `.apm/dynamic/`（根下） | **已废弃**；存在时会被 CLI 自动删除 |
-| `kb/dynamic/` | **已废弃**；存在时会被 CLI 自动删除 |
+| `.apm/archive/` | memory write 的分层快照，参与索引检索 |
+| `docs/`（项目根） | 知识库 .md，入版本控制；参与索引检索 |
 | 仓库内其他 `memory/` | 不参与 `apm read`，不要当作 `.apm` 使用 |
 
 ## 故障排查
@@ -347,18 +345,10 @@ EOF
 | 现象 | 处理 |
 |------|------|
 | `Old .apm layout detected` | 备份后删除/替换旧 `.apm`，再 `apm init`（不支持自动迁移） |
-| `Knowledge index missing` | `apm kb index rebuild` |
-| 联想区无结果 | 记忆与 kb 有共同词；`rebuild` |
-| 改完 `kb/docs/` 搜不到 | `apm kb index rebuild` |
+| `Knowledge index missing` | `apm index build` |
+| 联想区无结果 | 记忆与 docs/archive 有共同词；`index build` |
+| 改完 `docs/` 搜不到 | `apm index build` |
 | 长度报错 `got … max … need … fewer` | 缩短正文，或 `config set --max` 调大；可先 `validate` 干跑 |
 | `\n` 未换行 | **改用 heredoc / here-string 传真实换行**；短句才用 `--text` + `\n` |
 | PowerShell 管道中文乱码 | 用 `@'…'@` here-string 或 `Get-Content -Encoding UTF8 -Raw`，勿直接 `$str \| apm …` |
 | `Cannot use both --text and --stdin` | 只选其一 |
-
-## 已移除（勿再调用）
-
-| 旧能力 | 替代 |
-|--------|------|
-| `role` / `persist` / `dynamic` **`replace`** | `show` 后改全文，再 `write` |
-| `kb write` / `kb import` | 直接写 `.apm/kb/docs/`，再 `kb index rebuild` |
-| `kb dynamic` / `kbDynamicDetail` | 任务记忆只用 `memory/dynamic.md` |

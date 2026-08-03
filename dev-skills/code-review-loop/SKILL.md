@@ -119,7 +119,7 @@ review_round: 2
 wave_plan: [[review-scope-a, review-scope-b], [spec-fix-p0], [review-full]]
 node_status: { review-scope-a: done, spec-fix-p0: pending }
 must_fix: []   # open 项；须含 id, P0|P1|P2, 文件, 维度, 改法, 来源 node_id
-fix_spec_path: .apm/kb/docs/Iterations/<name>/cr-fix-spec.md
+fix_spec_path: docs/Iterations/<name>/cr-fix-spec.md
 spec_fix_plan: [[fix-spec-§P0], [fix-spec-§P1]]
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | fix-spec-ready 已确认
 ```
@@ -300,10 +300,10 @@ open → 不得 scope-ready / fix-spec-ready。
 默认（有 APM / 迭代结构时）：
 
 ```text
-.apm/kb/docs/Iterations/<需求名称>/cr-fix-spec.md
+docs/Iterations/<需求名称>/cr-fix-spec.md
 ```
 
-用户另指定则从其指定。落盘后若 APM 可用：`apm kb index rebuild`。
+用户另指定则从其指定。落盘后若 APM 可用：`apm index build`。
 
 ### fix-spec 文档结构（须遵守）
 

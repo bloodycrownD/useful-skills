@@ -17,19 +17,19 @@ disable-model-invocation: true
 ## 使用说明
 
 1. 先读取需求文档：
-   - 默认：`.apm/kb/docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；若 `dependency` 非空，一并读取所列前置 PRD
+   - 默认：`docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；若 `dependency` 非空，一并读取所列前置 PRD
    - **非标准输入**（用户口述、自定义路径）：以用户指定路径为准；`dynamic`「背景」记录需求路径（口述时可记「用户口述」）
-   - **APM 可用时**：`apm read` + `apm kb search --q "<需求名称/关键词>"` 检索相关历史方案与上下文（仅此步可由主代理直接做）
-   - **无 APM 环境**：直读 `.apm/kb/docs/...` 或 `requirement_path`
+   - **APM 可用时**：`apm read`（联想区检索 `docs/` 与 `.apm/archive/`）获取相关历史方案与上下文（仅此步可由主代理直接做）
+   - **无 APM 环境**：直读项目根 `docs/...` 或 `requirement_path`
    - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（背景含需求路径；目的=产出可确认的 spec）
 2. **在生成 `spec.md` 之前，必须先完成代码探索**（不可跳过）：
-   - 主代理基于需求文档（`requirement_path`）列出可能涉及的文件、模块、接口，并用 `apm kb search`（或直读 kb）补充检索相关 spec、变更记录与模块文档（仅此步可由主代理直接做）
+   - 主代理基于需求文档（`requirement_path`）列出可能涉及的文件、模块、接口，并用 `apm read`（联想区检索 `docs/` 与 `.apm/archive/`；或直读 `docs/`）补充检索相关 spec、变更记录与模块文档（仅此步可由主代理直接做）
    - **深入阅读代码、确认实现与约束须派遣多个子代理**（见「探索阶段」），主代理 **不得** 自行深入读代码、扫目录替代子代理
    - 主代理根据各子代理返回的 **探索报告** 汇总：影响范围、兼容性风险、技术边界、关键模块映射
    - **阶段完成**：按 `apm-usage` 刷新 `dynamic`「现状」；可跨会话复用的约束/模块边界写入 `persist`
 3. 完成代码探索后，再生成方案文档并写入知识库：
-   - `.apm/kb/docs/Iterations/<需求名称>/spec.md`
-   - **APM 可用时**写完后执行 `apm kb index rebuild`；无 APM 时直写文件即可
+   - `docs/Iterations/<需求名称>/spec.md`
+   - **APM 可用时**写完后执行 `apm index build`；无 APM 时直写文件即可
    - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（现状含 spec 路径与「待用户确认」）
 4. `spec.md` 须符合「文档格式规范」（YAML Front Matter + 正文），且必须基于真实代码上下文，不允许只依据需求文本做“空中方案”。
 5. SPEC 正文必须面向实现，至少包含：
@@ -138,19 +138,19 @@ blocking_steps: [...]
 
 ## 环境与工具 fallback
 
-- **无 APM 环境**：知识库直读 `.apm/kb/docs/...` 或 `requirement_path`；spec 落盘直写等价路径；记忆见「阶段记忆更新」与 `apm-usage`
+- **无 APM 环境**：知识库直读项目根 `docs/...` 或 `requirement_path`；spec 落盘直写等价路径；记忆见「阶段记忆更新」与 `apm-usage`
 - 下列 **`apm` 命令仅在 APM 可用时执行**；不可用时以读/写文件与 `docs/.iteration-state.yaml`（或对话内状态）为准
 
 ## 执行检查清单（每次都要走完）
 
 - [ ] 已读取需求文档（默认 `prd.md` 或 `requirement_path`）；标准 PRD 时已校验 Front Matter 并读取 `dependency` 所列前置 PRD（如有）
-- [ ] **APM 可用时**已 `apm read` / `apm kb search`（不可用时已直读 kb 或 `requirement_path`）
+- [ ] **APM 可用时**已 `apm read`（联想区检索 `docs/` 与 `.apm/archive/`）（不可用时已直读 `docs/` 或 `requirement_path`）
 - [ ] 需求读取后已按 `apm-usage` 更新 `dynamic`
 - [ ] 已派遣多个 readonly 探索子代理并 **同步等待** 全部探索报告
 - [ ] 主代理已汇总探索报告（影响范围、现状约束、关键模块映射；非主代理直接读代码）
 - [ ] 探索后已按 `apm-usage` 更新记忆
 - [ ] 已在方案中体现现状约束与影响分析
-- [ ] 已生成 `.apm/kb/docs/Iterations/<需求名称>/spec.md`（含 YAML Front Matter：`date`）；**APM 可用时**已 `apm kb index rebuild`
+- [ ] 已生成 `docs/Iterations/<需求名称>/spec.md`（含 YAML Front Matter：`date`）；**APM 可用时**已 `apm index build`
 - [ ] spec 落盘后已按 `apm-usage` 更新 `dynamic`
 - [ ] 已请求用户确认 `spec.md`
 - [ ] 用户确认后已刷新 `dynamic`「现状」（及必要时 `persist`）
@@ -164,7 +164,7 @@ blocking_steps: [...]
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `date` | string | `YYYY-MM-DD` |
-| `dependency` | string \| string[] | 前置 PRD 路径（相对 `kb/docs/`）；无则 `[]` |
+| `dependency` | string \| string[] | 前置 PRD 路径（相对 `docs/`）；无则 `[]` |
 
 非标准需求文档（用户口述、自定义路径）可无 Front Matter；主代理须在 `spec.md` 正文（如「需求来源」）注明来源与关键约束。
 

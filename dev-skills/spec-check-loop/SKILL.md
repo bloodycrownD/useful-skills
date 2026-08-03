@@ -73,8 +73,8 @@ disable-model-invocation: true
 ```yaml
 dag_version: 1
 review_round: 2
-prd_path: .apm/kb/docs/Iterations/<name>/prd.md
-spec_path: .apm/kb/docs/Iterations/<name>/spec.md
+prd_path: docs/Iterations/<name>/prd.md
+spec_path: docs/Iterations/<name>/spec.md
 open_must_fix: []
 doc_fix_plan: [[spec-§3], [prd-验收, spec-测试]]  # wave 计划；完成后置 []
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | execute-ready 已确认
@@ -92,7 +92,7 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 
 - 已知：`PRD path`、`SPEC path`（至少 SPEC；仅有 PRD 时须先补齐 spec 或标明 SPEC 待写）
 - 已知：仓库根路径、迭代名称（如 `agent-run-lifecycle-unify`）
-- 若项目使用 APM：`apm read` + `apm kb search --q "<关键词>"`（workspace 不完整时仍可手工读 `.apm/kb/docs/...`）
+- 若项目使用 APM：`apm read`（联想区检索 `docs/` 与 `archive/`）（workspace 不完整时仍可手工读项目根 `docs/...`）
 - **不要求**工作区干净（本阶段只改文档）；若同时改代码则偏离本 skill
 
 **准备完成**：按 `apm-usage` 刷新 `dynamic`（背景=文档路径与用户意图；目的=达 execute-ready；现状=待首轮审查）。编排状态写入 iteration-state，勿塞进记忆槽。
@@ -238,7 +238,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - P1：优先修；来不及则写入 SPEC「风险与实现注」并标为已知限制
 - 修复后 **同步 PRD 与 SPEC**（验收、命名、契约一致）
 - 大改契约时检查 `dependency` 前置 PRD 是否需同步一句
-- 若修改了 kb 内 PRD/SPEC 且 APM 可用：执行 `apm kb index rebuild`
+- 若修改了 docs 内 PRD/SPEC 且 APM 可用：执行 `apm index build`
 
 **修复完成**：主代理更新 iteration-state（轮次、闭合列表）；按 `apm-usage` 刷新 `dynamic`「现状」。已拍板且跨任务仍有效的契约可写入 `persist`。
 
