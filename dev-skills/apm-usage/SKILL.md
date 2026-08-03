@@ -1,6 +1,6 @@
 ---
 name: apm-usage
-description: APM CLI 与外置记忆语义规范：persist（跨会话规则，类 AGENTS.md）、dynamic（背景/目的/现状）、role、index build、read/write/validate。在提到 apm、.apm、外置记忆、会话恢复，或其它 skill 需更新 dynamic/persist 时使用。本文件为记忆「写什么」的唯一权威；其它 skill 不得另立字段表。
+description: APM CLI 与外置记忆语义规范：persist（跨会话规则，类 AGENTS.md）、dynamic（背景/目的/现状）、role、index build、read/write。在提到 apm、.apm、外置记忆、会话恢复，或其它 skill 需更新 dynamic/persist 时使用。本文件为记忆「写什么」的唯一权威；其它 skill 不得另立字段表。
 disable-model-invocation: true
 ---
 
@@ -16,16 +16,6 @@ apm read                         # 会话开始必做
 # … 执行任务 …
 
 # 多行写入（推荐 heredoc + --stdin）；dynamic 须含 背景/目的/现状
-cat <<'EOF' | apm dynamic validate --stdin   # 可选：写入前干跑
-## 背景
-…
-
-## 目的
-…
-
-## 现状
-…
-EOF
 cat <<'EOF' | apm dynamic write --stdin
 ## 背景
 …
@@ -118,10 +108,9 @@ EOF
 | PowerShell 多行 | **here-string** `@'…'@` 管道到 `--stdin`（中文勿直接 `$str \| apm`） |
 | 已有文件作记忆正文 | 重定向或 `Get-Content -Raw -Encoding UTF8` 管道 |
 | 单行短句 | `--text "…"` |
-| 写入前检查长度 | 同样用 heredoc / 文件管道到 `validate --stdin` |
 | 知识库 `.md` | **直接写文件**到项目根 `docs/`，再 `apm index build` |
 
-- **`write` / `validate` 均不强制 `--text`**；`--text` 与 `--stdin` **互斥**。
+- **`write` 不强制 `--text`**；`--text` 与 `--stdin` **互斥**。
 - **不要**在 `--text` 里手工拼多行 `\n`；heredoc / here-string 传**真实换行**。
 - **无 `--file`**。
 
@@ -136,11 +125,6 @@ cat <<'EOF' | apm dynamic write --stdin
 
 ## 现状
 核心逻辑已合入；下一步补单元测试。
-EOF
-
-# bash：写入前干跑
-cat <<'EOF' | apm dynamic validate --stdin
-…
 EOF
 
 # PowerShell：here-string
@@ -161,7 +145,7 @@ Get-Content .\draft.md -Raw -Encoding UTF8 | apm dynamic write --stdin
 
 ```
 .apm/                    # 运行态目录（整体 .gitignore）
-  config/config.json     # 各段 max 上限；initializedAt / updatedAt / lastReadAt
+  config/config.json     # initializedAt / updatedAt / lastReadAt
   config/index.gz        # 搜索索引（`apm index build` 产物）
   memory/role.md         # 角色
   memory/persist.md      # 持久规则（类 AGENTS.md）
@@ -171,18 +155,6 @@ docs/                    # 项目根，知识库 .md（可嵌套；直接写文�
 ```
 
 知识库文档写入项目根 `docs/`（如 `Iterations/foo/prd.md`），再 `apm index build`。检索与联想中的路径带来源前缀（如 `docs/foo.md`、`archive/2026/06/18/dynamic/143052127.md`）。
-
-## 默认长度上限（仅 max，无下限）
-
-| 段 | config section | 默认 max |
-|----|----------------|----------|
-| 角色 | `role` | 100 |
-| 持久记忆 | `persist` | 800 |
-| 动态记忆 | `dynamicDetail` | 1500 |
-
-- **无下限**：任意短文本（含 1 字、空串）均可写入。
-- **仅上限**：超过 `max` 时拒绝写入，报错含 `got n, max m, need k fewer chars`。
-- `docs/` 下文件**不受**上述 max 限制（直接写文件，不经 CLI write）。
 
 ## `apm read` 输出
 
@@ -202,7 +174,7 @@ docs/                    # 项目根，知识库 .md（可嵌套；直接写文�
 
 ### 记忆：`role` | `persist` | `dynamic`
 
-`show` · `write` · `validate`（**无** `replace`）
+`show` · `write`（**无** `replace`、**无** `validate`）
 
 ```bash
 apm role show
@@ -218,19 +190,6 @@ apm role write --text "单行短句"
 - **`--stdin`**：从标准输入读取全文；与 `--text` 互斥。
 - **`--text <正文>`**：单行参数；支持转义 `\n` `\t` `\r` `\\`（短句可用）。
 - **管道**：未传 `--text` 且 stdin 非 TTY 时自动读 stdin，可省略 `--stdin` 标志。
-
-#### `validate`（干跑，不落盘）
-
-```bash
-cat <<'EOF' | apm dynamic validate --stdin
-草稿正文
-EOF
-apm persist validate --stdin < draft.md
-apm role validate --text "短草稿"
-```
-
-- 规则与 `write` 相同（仅检查 max）；成功输出 `OK: <当前长度>/<max>`。
-- 不写盘、不归档、不触发索引重建。
 
 #### 写入说明
 
@@ -251,7 +210,6 @@ apm role validate --text "短草稿"
 |------|--------------|
 | `role` / `persist` / `dynamic` **`write`** | 每次 +1 条分层快照 |
 | `dynamic write --text ""` | 目标变为空模板，仍 +1 条空模板快照 |
-| `validate` | **不**写盘、不归档 |
 
 ### 知识库与索引
 
@@ -267,17 +225,14 @@ apm index build       # 扫描项目根 docs/ 与 .apm/archive/，重建 .apm/co
 |------|--------------------|
 | `role` / `persist` / `dynamic` 的 write | 是 |
 | 直接写入/移动 `docs/` | 否（须手动 `index build`） |
-| `validate`（各段） | 否 |
 
 ### 配置
 
 ```bash
 apm config show
-apm config set --section role|persist|dynamicDetail --max <n>
 ```
 
-- 各段 limits **仅含 `max`**。
-- `config set` 写回时只持久化 `{ "max": n }`。
+- 输出 `initializedAt` / `updatedAt` / `lastReadAt` 三个时间戳字段。
 
 ## 典型场景
 
@@ -309,28 +264,6 @@ apm index build
 apm read
 ```
 
-**写入前干跑：**
-
-```bash
-cat <<'EOF' | apm dynamic validate --stdin
-## 背景
-…
-## 目的
-…
-## 现状
-…
-EOF
-# OK: n/max 后再 write（同一 heredoc 正文）
-cat <<'EOF' | apm dynamic write --stdin
-## 背景
-…
-## 目的
-…
-## 现状
-…
-EOF
-```
-
 ## 勿混淆的路径
 
 | 路径 | 用途 |
@@ -348,7 +281,6 @@ EOF
 | `Knowledge index missing` | `apm index build` |
 | 联想区无结果 | 记忆与 docs/archive 有共同词；`index build` |
 | 改完 `docs/` 搜不到 | `apm index build` |
-| 长度报错 `got … max … need … fewer` | 缩短正文，或 `config set --max` 调大；可先 `validate` 干跑 |
 | `\n` 未换行 | **改用 heredoc / here-string 传真实换行**；短句才用 `--text` + `\n` |
 | PowerShell 管道中文乱码 | 用 `@'…'@` here-string 或 `Get-Content -Encoding UTF8 -Raw`，勿直接 `$str \| apm …` |
 | `Cannot use both --text and --stdin` | 只选其一 |
