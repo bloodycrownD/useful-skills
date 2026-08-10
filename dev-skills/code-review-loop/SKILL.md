@@ -70,7 +70,7 @@ disable-model-invocation: true
 ## 主代理禁止
 
 - **自审**：review* 须 readonly 子代理
-- **自改 fix-spec**：spec-fix 须 Task 子代理；主代理不得直接编辑闭合 must-fix
+- **自改 fix-spec**：spec-fix 须 Task 子代理；主代理不得直接编辑闭合 must-fix（trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）
 - **改实现 / 跑门禁**：不得在本 skill 内改代码、跑 verify/lint 代替下游执行
 - **not-ready 时口头收尾**：不得只描述改法而不派 spec-fix；须更新 `spec_fix_plan` 并 `dag_version++`
 
@@ -93,11 +93,25 @@ review* **须 readonly**。波次内功能小检（func）属 **code-dev-loop**�
 | 节点 | 工具 | subagent_type | readonly | 说明 |
 |------|------|---------------|----------|------|
 | **review** / **review-scope** / **review-full** | Task | generalPurpose | **true** | 非自审 |
-| **spec-fix** | Task | generalPurpose | false | **只改 fix-spec**（及用户指定的文档路径） |
+| **spec-fix** | Task（默认）；trivial 时主代理直接执行（见下） | generalPurpose | false | **只改 fix-spec**（及用户指定的文档路径） |
 
 - 同 wave 无冲突可并行；**同步等待** 当前 wave 全部返回后再汇总
 - **同文件禁止** 并行 spec-fix
-- **失败**：重试一次 → 仍失败则主代理可手工等效 spec-fix，标注「手工 spec-fix」
+- **失败**：重试一次 → 仍失败则主代理可手工等效 spec-fix，标注「手工 spec-fix」。注意这与下文 trivial 豁免不同：失败兜底用于子代理跑挂的应急，trivial 豁免用于本来就不值得派子代理的轻量改动。
+
+### trivial 豁免（主代理直接执行）
+
+**trivial** 指本轮 must-fix 很少且改法明确——主代理写几行就能闭合，既不需要上下文隔离、又不需要并行——的情况。
+
+spec-fix 只改 fix-spec 文档。如果本轮 must-fix 很少且改法明确——写几行就完——主代理直接改 fix-spec 更快，不必派子代理。
+
+判据是 **主代理直接执行不会消耗主代理大量上下文**：must-fix 条目少、位置已知（fix-spec 章节明确）、不需要读大量代码来措辞。拿不准时，以「预估 ≤3 次工具调用（含读文件、搜索、跑测试等）」作为兜底倾向主代理直接执行。
+
+这是对「主代理禁止」里 spec-fix 须子代理的显式例外——该禁止默认成立，仅当上述判据全部满足时才可由主代理直接执行。
+
+**不适用**：review / review-scope / review-full（审查独立性须保留，且审查天生要读多个文件对照）。
+
+主代理直接执行后，在 `dynamic`「现状」或汇报里标注「trivial 直接执行」，与失败兜底的「手工 spec-fix」区分。
 
 ---
 

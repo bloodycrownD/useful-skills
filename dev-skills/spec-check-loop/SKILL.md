@@ -36,13 +36,13 @@ disable-model-invocation: true
 
 ### 审查轮（review round）
 
-一次完整的：**子代理 readonly 审查 → 主代理汇总 →（若未 ready）派遣 doc-fix 子代理并同步等待 → 下一轮**。
+一次完整的：**子代理 readonly 审查 → 主代理汇总 →（若未 ready）派遣 doc-fix 子代理并同步等待，或满足 trivial 豁免时主代理直接闭合 → 下一轮。无论走子代理还是直接执行，都算同一轮内的事，闭合后 `review_round +1`**。
 
 轮次从 1 开始；当前轮次与上轮 must-fix 闭合情况写在 **iteration-state**，`dynamic`「现状」只用一两句人话概括。
 
 ### 同步等待
 
-每轮审查须 **派发审查子代理并等待返回** 后再汇总；not-ready 时须 **派发 doc-fix 子代理并等待返回** 后再进入下轮审查。禁止未审即改、未等 fix 即宣称 ready。
+每轮审查须 **派发审查子代理并等待返回** 后再汇总；not-ready 时须 **派发 doc-fix 子代理并等待返回** 后再进入下轮审查。禁止未审即改、未等 fix 即宣称 ready（trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）。
 
 ### 子代理派遣规范
 
@@ -54,6 +54,20 @@ disable-model-invocation: true
 - **同步等待** 当前 wave 全部 doc-fix 返回后再汇总、进入下轮审查
 - **同文件禁止** 并行 doc-fix（PRD 与 SPEC 视为不同文件）
 - **失败**：重试一次 → 仍失败则主代理可手工等效 doc-fix，标注「手工 doc-fix」（见「失败处理」）
+
+### trivial 豁免（主代理直接执行）
+
+**trivial** 指本轮 must-fix 条目少、改的是措辞或补一两句而不动结构、不需要重读大段代码来措辞的情形——既不需要上下文隔离、又不需要并行。
+
+doc-fix 改的是 PRD/SPEC 文档。如果本轮 must-fix 很少且改法明确——补几句话就完——主代理直接改更快，没必要派子代理走一趟。
+
+判据是 **主代理直接执行不会消耗主代理大量上下文**：must-fix 条目少、改的是措辞或补一两句而不动结构、不需要重读大段代码来措辞。拿不准时，以「预估 ≤3 次工具调用（含读文件、搜索、跑测试等）」作为兜底倾向直接执行。调用次数只是粗略指标，本质还是看上下文消耗。
+
+这是对「主代理禁止直接编辑 PRD/SPEC」的显式例外——该禁止默认成立，仅当上述判据全部满足时才可由主代理直接执行。另一条主代理直改的合法路径是「失败处理」里的手工 doc-fix（子代理失败后的兜底，标注「手工 doc-fix」），两者语义不同，勿混。
+
+豁免是「不派 doc-fix 子代理、由主代理直接执行」，不是 doc-fix 的一种派遣方式。表格中的 doc-fix 行适用于不满足豁免判据时的正常派遣。
+
+**不适用**：review（审查独立性须保留，且审查天生要读多个文件对照代码库）。
 
 ---
 
@@ -113,7 +127,7 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 
 **主代理职责**（仅此）：拆 wave、派 Task、同步等待、汇总、改 `doc_fix_plan` / `dag_version`、向用户汇报。
 
-**主代理禁止**：直接编辑 PRD/SPEC 闭合 must-fix；未等 doc-fix 子代理返回即进入下轮审查。
+**主代理禁止**：直接编辑 PRD/SPEC 闭合 must-fix（trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）；未等 doc-fix 子代理返回即进入下轮审查。
 
 ---
 
@@ -180,7 +194,7 @@ P0 定义：矛盾、缺失 API/验收、与现有代码冲突、实施必打架
    - **not ready**：存在未闭合 P0，或子代理 No-Go
 3. **向用户简短汇报**（一轮一次）：轮次、P0 数量、是否 ready；**not ready** 时列出 P0 标题
 
-**主代理禁止**：亲自编辑 PRD/SPEC 闭合 must-fix（须进入 Step 3 派 doc-fix 子代理）。
+**主代理禁止**：亲自编辑 PRD/SPEC 闭合 must-fix（须进入 Step 3 派 doc-fix 子代理；trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）。
 
 not ready 时：根据 must-fix 拆 wave、写入 `doc_fix_plan`，`dag_version++`，进入 Step 3。
 
@@ -188,7 +202,7 @@ not ready 时：根据 must-fix 拆 wave、写入 `doc_fix_plan`，`dag_version+
 
 ## Step 3：派遣文档 fix 子代理（仅 not ready 时）
 
-not ready 时，主代理 **必须** 派遣 doc-fix 子代理修复 PRD/SPEC，**不得**主代理直改。
+not ready 时，主代理 **必须** 派遣 doc-fix 子代理修复 PRD/SPEC，**不得**主代理直改（trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）。
 
 ### 派遣规则
 
@@ -199,7 +213,7 @@ not ready 时，主代理 **必须** 派遣 doc-fix 子代理修复 PRD/SPEC，*
 
 ### 主代理禁止
 
-- 直接编辑 PRD/SPEC 闭合 must-fix
+- 直接编辑 PRD/SPEC 闭合 must-fix（trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）
 - 未等 doc-fix 子代理返回即进入下轮审查
 
 ### doc-fix 子代理 prompt 模板（派遣用）
@@ -302,7 +316,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - [ ] 已读 PRD + SPEC + dependency 前置
 - [ ] 每轮已派 readonly 审查子代理并 **同步等待**
 - [ ] 审查含代码库对照，非空泛文档互审
-- [ ] not-ready 时已派 doc-fix 子代理并 **同步等待**（非主代理直改）
+- [ ] not-ready 时已派 doc-fix 子代理并 **同步等待**；若满足 trivial 豁免（见「子代理派遣规范 · trivial 豁免」）可由主代理直接执行，须在 `dynamic`「现状」注明
 - [ ] P0 闭合后才可宣称 execute-ready
 - [ ] 未在用户确认前开始编码
 - [ ] 已按 `apm-usage` 更新 `dynamic`（及必要时 `persist`）
