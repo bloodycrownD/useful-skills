@@ -54,7 +54,6 @@ disable-model-invocation: true
 
 - `<需求名称>`：所属迭代（与 `Iterations/` 下目录一致）；无法确定时询问用户
 - `<敏捷名称>`：简短 kebab-case 标识（如 `login-timeout-on-refresh`、`export-csv-button`）
-- 两个文档写完后均执行 `apm index build`
 
 ### 输入来源
 
@@ -67,11 +66,11 @@ disable-model-invocation: true
 
 1. 根据用户意图判定 **bug** 或 **feature**；含糊时只问**一个**聚焦问题
 2. 确定 `<需求名称>`、`<敏捷名称>`（kebab-case）
-3. 执行 `apm read`（联想区会检索 docs/ 与 archive/）
+3. 执行 `apm read`（联想区会检索整个 docs/ 目录）
 4. 读取父级 `docs/Iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
 5. **分支安全闸**：禁止在 `main` / `master` 直接改；工作区须干净
 
-**阶段完成**：按 `apm-usage` 刷新 `dynamic`（背景/目的/现状：类型、敏捷名称、父级路径等用人话写进三节）。
+**阶段完成**：更新 `docs/apm/memory/` 下的记忆文件（用人话记录类型、敏捷名称、父级路径等背景与进度）。
 
 ---
 
@@ -100,9 +99,9 @@ disable-model-invocation: true
 | 工具 | `Task`，`subagent_type: explore` |
 | readonly | **true** |
 | 并行 | 1–3 个，同步等待 |
-| 失败 | 重试一次 → 手工探索，写入 `dynamic`「现状」 |
+| 失败 | 重试一次 → 手工探索，更新 `docs/apm/memory/` 下的记忆文件 |
 
-**阶段完成**：按 `apm-usage` 刷新 `dynamic`「现状」；可跨会话复用的根因/边界规则写入 `persist`。
+**阶段完成**：更新 `docs/apm/memory/` 下的记忆文件（记录现状）；可跨会话复用的根因/边界规则更新 `RULE.md`。
 
 ### 探索子代理须返回（探索报告）
 
@@ -157,7 +156,7 @@ disable-model-invocation: true
 
 拿不准时，以「预估 ≤3 次工具调用（含读文件、搜索、跑测试等）」作为兜底倾向主代理直接执行。
 
-满足时主代理直接改，但须同样运行针对性测试/build，并在 `dynamic`「现状」注明「trivial 豁免，主代理直接实现」。
+满足时主代理直接改，但须同样运行针对性测试/build，并在 `docs/apm/memory/` 下的记忆文件注明「trivial 豁免，主代理直接实现」。
 
 **不适用**：改动面大、需要读多个文件才能下手、或验证输出会很长的情况——这些仍派子代理，让上下文消耗发生在子代理那边。
 
@@ -202,7 +201,7 @@ disable-model-invocation: true
 4）阻塞项（如有）
 ```
 
-**阶段完成**：按 `apm-usage` 刷新 `dynamic`「现状」（分支/HEAD 一句话即可）；SHA、验证流水放对话或 Bundle，勿堆进记忆。无新跨会话规则则不动 `persist`。
+**阶段完成**：更新 `docs/apm/memory/` 下的记忆文件（分支/HEAD 一句话即可）；SHA、验证流水放对话或 Bundle，勿堆进记忆。无新跨会话规则则不动 `RULE.md`。
 
 ---
 
@@ -216,7 +215,7 @@ disable-model-invocation: true
 
 未通过则回到 Step 2 或 Step 3，不得进入留痕文档。
 
-**阶段完成**：按 `apm-usage` 刷新 `dynamic`「现状」（通过/失败与下一步）；验证命令明细不必写入 persist。
+**阶段完成**：更新 `docs/apm/memory/` 下的记忆文件（通过/失败与下一步）；验证命令明细不必写入 RULE.md。
 
 ---
 
@@ -226,7 +225,6 @@ disable-model-invocation: true
 
 1. 写入 `bugs/<敏捷名称>/` 或 `features/<敏捷名称>/` 下的 **`prd.md`**（业务/现象/需求视角）
 2. 写入同目录 **`spec.md`**（技术/实现视角）
-3. 执行 `apm index build`
 
 ### prd.md Front Matter
 
@@ -314,7 +312,7 @@ agile_trace: true
 ## 风险与回滚方案
 ```
 
-**阶段完成**：按 `apm-usage` 刷新 `dynamic`（现状含 prd/spec 路径与「待用户确认」）。
+**阶段完成**：更新 `docs/apm/memory/` 下的记忆文件（现状含 prd/spec 路径与「待用户确认」）。
 
 ---
 
@@ -322,13 +320,16 @@ agile_trace: true
 
 - 向用户说明：类型、敏捷名称、路径、探索结论、改动与验证摘要
 - 请用户确认 `prd.md` / `spec.md` 与代码一致
-- **用户确认后**：按 `apm-usage` 刷新 `dynamic`「现状」（敏捷项已完成）；可跨会话复用的摘要可写入 `persist`
+- **用户确认后**：更新 `docs/apm/memory/` 下的记忆文件（敏捷项已完成）；可跨会话复用的摘要可更新 `RULE.md`
 
 ---
 
 ## 阶段记忆更新
 
-遵守 **`apm-usage`「记忆语义」**。每阶段重写 `dynamic` 三节；仅当有新跨会话规则时改 `persist`。分支、SHA、验证命令、探索全文属过程细节，放对话/Bundle，勿塞记忆槽。
+- **RULE.md（`docs/apm/RULE.md`）**：持久规则，类似 AGENTS.md，记录跨会话有效的术语、能力边界等；只在出现新的跨会话规则时才更新。
+- **memory 文件（`docs/apm/memory/yyyyMMdd-name.md`）**：带时间的对话记忆，记录前因后果与执行进度；每阶段更新一份。
+- agent 直接写文件，不走 APM 命令。
+- 分支、SHA、验证命令、探索全文属过程细节，放对话/Bundle，勿塞 RULE.md 或 memory。
 
 ---
 
@@ -339,9 +340,9 @@ agile_trace: true
 - [ ] 已派遣 readonly 探索子代理并同步等待；主代理已汇总探索结论
 - [ ] 已在非保护分支实现（子代理 inline，或 trivial 豁免由主代理直接实现并已验证）
 - [ ] 针对性测试与 build 已通过
-- [ ] 已生成 `bugs|features/<敏捷名称>/prd.md` 与 `spec.md`（含 Front Matter）并已 `apm index build`
+- [ ] 已生成 `bugs|features/<敏捷名称>/prd.md` 与 `spec.md`（含 Front Matter）
 - [ ] 文档内容与真实改动一致，未编造
-- [ ] 已向用户说明并请确认；确认后已按 `apm-usage` 更新记忆
+- [ ] 已向用户说明并请确认；确认后已更新 `docs/apm/memory/` 下的记忆文件（必要时同步 `RULE.md`）
 
 ---
 
@@ -350,7 +351,7 @@ agile_trace: true
 **子代理调用失败**（如 `resource_exhausted`）：
 
 1. 短暂停顿后重试一次
-2. 仍失败：主代理可手工完成，但须同样运行验证并在 `dynamic`「现状」注明
+2. 仍失败：主代理可手工完成，但须同样运行验证并在 `docs/apm/memory/` 下的记忆文件注明
 3. 资源恢复后优先回到子代理流程
    - 走 trivial 豁免时无子代理调用，验证未通过按 Step 4 处理（回到 Step 2 或 Step 3）
 

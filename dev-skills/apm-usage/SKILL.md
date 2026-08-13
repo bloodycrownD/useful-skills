@@ -1,286 +1,230 @@
 ---
 name: apm-usage
-description: APM CLI 与外置记忆语义规范：persist（跨会话规则，类 AGENTS.md）、dynamic（背景/目的/现状）、role、index build、read/write。在提到 apm、.apm、外置记忆、会话恢复，或其它 skill 需更新 dynamic/persist 时使用。本文件为记忆「写什么」的唯一权威；其它 skill 不得另立字段表。
+description: APM（Agent Persistence Memory）使用指南：用 apm init 初始化、apm read 读取规则与最近记忆并触发联想、apm search 实时检索 docs/ 下所有 .md。记忆由 agent 直接写文件到 docs/apm/memory/，不通过 APM 命令；持久规则维护在 docs/apm/RULE.md。在提到 apm、外置记忆、会话恢复、记忆检索，或需要按统一约定记录对话记忆时使用。本文件为记忆「写什么、怎么读」的唯一权威，其它 skill 不得另立字段表或目录约定。
 disable-model-invocation: true
 ---
 
 # APM 使用指南
 
-对应 CLI：`agent-persistence-memory`（`apm`）≥ 1.0.0。
+对应 CLI：`agent-persistence-memory`（`apm`）。
+
+APM 现在只做三件事：初始化目录、读取规则与记忆、实时搜索文档。记忆文件由 agent 直接写到磁盘上，不走 APM 命令。整体围绕一个 `docs/apm/` 目录展开，不再有 `.apm/` 运行态目录。
 
 ## 快速开始
 
 ```bash
-apm init
-apm read                         # 会话开始必做
+apm init                # 在项目根初始化 docs/apm/（幂等，已存在不报错）
+apm read                # 会话开始必做：规则区 + 最近记忆 + 联想区
 # … 执行任务 …
 
-# 多行写入（推荐 heredoc + --stdin）；dynamic 须含 背景/目的/现状
-cat <<'EOF' | apm dynamic write --stdin
-## 背景
-…
-
-## 目的
-…
-
-## 现状
-…
-EOF
+# 记录一条新记忆：agent 直接写文件到 docs/apm/memory/，不走 APM 命令
+#   文件名：yyyyMMdd-简短标识.md，例如 docs/apm/memory/20260814-foo-done.md
 ```
 
-- 在**项目根目录**（将创建或使用 `.apm/`）执行。
+- 在**项目根目录**执行命令；`docs/apm/` 就建在这里。
 - 入口：`apm`（或 `npx apm`；源码仓库需先 `npm run build`）。
-- **工作区自动补齐**：任意命令首次执行时会创建或补全 `.apm/`；`apm init` 等价且幂等。
+- 记忆文件由 agent 用写文件工具直接落盘，APM 不提供「写入」命令。
 
 ---
 
-## 记忆语义（权威规范）
+## 记忆语义
 
-其它 dev-skill 更新 `dynamic` / `persist` 时 **一律遵守本节**；不得再自造「阶段字段表」覆盖本节。CLI 细节见后文。
+APM 把记忆分成两层，两层都落在 `docs/apm/` 里，跟着项目一起进版本控制。
 
-### 三段分工
+### RULE.md：持久规则（类 AGENTS.md）
 
-| 段 | 是什么 | 不是什么 |
-|----|--------|----------|
-| **role** | Agent 身份/口吻 | 任务进度 |
-| **persist** | 跨会话仍有效的**持久规则**，写法接近 `AGENTS.md`：约定、边界、已拍板决策、踩坑后的行为约束 | 当前任务进度、DAG、探索流水、验证日志 |
-| **dynamic** | **当前任务**的工作记忆；固定用「背景 / 目的 / 现状」三节 | 机器状态库、节点表、wave 计划全文 |
-
-### `dynamic`：背景 · 目的 · 现状
-
-每次 `dynamic write` 用**全量覆盖**，正文须含这三节（可用 `##` 标题）：
-
-```markdown
-## 背景
-用户原话/命令摘要；相关 PRD/SPEC（或需求）路径；为何开这个任务。
-
-## 目的
-本轮要交付什么；验收大致长什么样；当前阶段终点（如「PRD 待确认」「dev-ready」）。
-
-## 现状
-做到哪了；卡在哪；解决思路与下一步（人话，短句即可）。
-```
-
-| 宜写入 | 不宜写入 |
-|--------|----------|
-| 用户指令要点、任务目标、关键文档路径 | DAG 节点表 / 边 / `wave_plan` / `dag_version` / `node_status` |
-| 当前阶段结论一句话、阻塞原因、下一步思路 | 探索报告全文、verify 命令流水、commit 列表 |
-| 确认态可用一句写在「现状」（如「用户已确认 spec」） | 把 `prd_confirmed` 等当 schema 堆字段 |
-
-阶段推进时：**重写三节**，不要把过程日志往下追加。已无 `replace` 子命令——局部改也须 `write` 全量覆盖。
-
-### `persist`：持久规则（类 AGENTS.md）
-
-只写**换会话仍该遵守**的内容，例如：
+`docs/apm/RULE.md` 装的是**换会话仍该遵守**的内容，写法和 `AGENTS.md` 一样，偏约定、边界、已拍板的决策。适合写：
 
 - 项目术语、模块边界、命名约定
 - 用户拍板且跨任务仍有效的决策（「X 模块不负责 Y」）
 - 协作/实现约束（「blocking 步骤必须有对应测试 id」）
 
-**不要**把「本迭代做到哪一步」「某次 verify 过了没」写进 persist。路径类信息若只服务当前任务，放 `dynamic`「背景」即可；仅当路径已成为团队约定时才进 persist。
+**不要**把「本会话做到哪一步」「某次验证过了没」写进 RULE.md——那是具体对话记忆的范畴。路径类信息如果只是服务当前任务，写成一条记忆就好；只有当某条路径已经是团队约定时，才值得进 RULE.md。
 
-有新规则用 `write` 全量整理；无新规则则**本阶段可不碰 persist**。
+RULE.md 由 agent 直接维护：有新规则就整理进去，没有就别动它。
 
-### 机器状态放哪（禁止塞进记忆槽）
+### memory 文件：带时间的对话记忆
 
-下列内容属于**工作流状态**，写到 Context Bundle、`docs/.iteration-state.yaml`、对话内 YAML，或 kb 文档——**不要**写入 `dynamic` / `persist`：
+`docs/apm/memory/` 下的每个 `.md` 文件是一条**对话记忆**，文件名形如 `yyyyMMdd-简短标识.md`。它记录的是某次具体的交流——用户问了什么、我回了什么、当时的关键结论是什么。文件靠 front matter 的 `date` 排序，`apm read` 会取最近的几条做摘要。
 
-- 开发 / 审查 DAG：`wave_plan`、节点表、边、`dag_version`、`node_status`
-- 轮次计数、open must-fix 清单、doc_fix_plan / spec_fix_plan
-- Bundle-full / Bundle-delta 大段 YAML
-- 探索报告原文、验证输出原文
+记忆文件适合写：
 
-`apm read` 的记忆槽给**人读、接续任务**用；状态机给编排逻辑用。二者分开。
+- 某次讨论的关键问答与结论
+- 用户透露的偏好、踩过的坑、当时的决策理由
+- 当前任务的阶段性进展（作为事后回顾，而不是工作流状态）
 
-### 与其它 skill 的关系
-
-- 本文件 = `dynamic` / `persist` **写什么**的唯一权威。
-- 其它 skill 阶段结束时：按本节刷新 `dynamic` 三节；**仅当**出现可跨会话复用的规则时才更新 `persist`。
-- 无 APM 时：可用 `docs/.iteration-state.yaml` 或对话内等价维护「背景 / 目的 / 现状」与规则条文，语义相同。
+不要把 DAG 节点表、wave 计划、验证日志这类**工作流状态**塞进记忆文件，那些东西属于 Context Bundle 或其它编排文件。
 
 ---
 
-## Agent 写入正文：多行优先 heredoc + `--stdin`
+## 目录结构
 
-| 场景 | 推荐方式 |
-|------|----------|
-| 多行 / 长正文（记忆段） | **bash heredoc** 管道到 `--stdin` |
-| PowerShell 多行 | **here-string** `@'…'@` 管道到 `--stdin`（中文勿直接 `$str \| apm`） |
-| 已有文件作记忆正文 | 重定向或 `Get-Content -Raw -Encoding UTF8` 管道 |
-| 单行短句 | `--text "…"` |
-| 知识库 `.md` | **直接写文件**到项目根 `docs/`，再 `apm index build` |
+```
+docs/
+  apm/
+    RULE.md          # 持久规则，agent 直接维护
+    memory/          # 对话记忆目录
+      yyyyMMdd-name.md
+      .gitkeep       # apm init 创建，保证空目录能进版本控制
+```
 
-- **`write` 不强制 `--text`**；`--text` 与 `--stdin` **互斥**。
-- **不要**在 `--text` 里手工拼多行 `\n`；heredoc / here-string 传**真实换行**。
-- **无 `--file`**。
+- `docs/apm/RULE.md`：持久规则，`apm read` 的规则区会原样输出它。
+- `docs/apm/memory/*.md`：每条一个文件，`apm read` 取最近 5 条做摘要，`apm search` 实时扫描它们。
+- 不再有 `.apm/` 目录，也不再有 role/persist/dynamic 之分；持久规则统一在 `RULE.md`，对话记忆统一在 `memory/`。
+- `apm read` 的联想区和 `apm search` 都扫描**整个 `docs/`**（不只是 `docs/apm/`），所以项目里其它 `.md` 文档同样会被检索到。
+
+---
+
+## 命令详解
+
+只有三个命令：`apm init`、`apm read`、`apm search`。没有 role/persist/dynamic/write/show/index/config，也不再需要预先建索引。
+
+### `apm init`
+
+幂等地初始化记忆目录：
 
 ```bash
-# bash：多行 dynamic（Agent 首选；须含 背景/目的/现状）
-cat <<'EOF' | apm dynamic write --stdin
-## 背景
-用户要求实现 foo；SPEC：Iterations/foo/spec.md
-
-## 目的
-按 spec 完成 foo 并跑通相关测试。
-
-## 现状
-核心逻辑已合入；下一步补单元测试。
-EOF
-
-# PowerShell：here-string
-@'
-## 背景
-…
-## 目的
-…
-## 现状
-…
-'@ | apm dynamic write --stdin
-
-# PowerShell：从 UTF-8 文件读入记忆段
-Get-Content .\draft.md -Raw -Encoding UTF8 | apm dynamic write --stdin
+apm init
 ```
 
-## 工作区
+它会创建：
 
-```
-.apm/                    # 运行态目录（整体 .gitignore）
-  config/config.json     # initializedAt / updatedAt / lastReadAt
-  config/index.gz        # 搜索索引（`apm index build` 产物）
-  memory/role.md         # 角色
-  memory/persist.md      # 持久规则（类 AGENTS.md）
-  memory/dynamic.md      # 当前任务：背景 / 目的 / 现状
-  archive/               # memory 三段 write 时写入的分层快照
-docs/                    # 项目根，知识库 .md（可嵌套；直接写文件，入版本控制）
-```
+- `docs/apm/RULE.md`（若不存在，给一个可写的初始模板）
+- `docs/apm/memory/.gitkeep`
 
-知识库文档写入项目根 `docs/`（如 `Iterations/foo/prd.md`），再 `apm index build`。检索与联想中的路径带来源前缀（如 `docs/foo.md`、`archive/2026/06/18/dynamic/143052127.md`）。
+已经存在的文件不会被覆盖，重复执行也不报错。新项目第一次接入 APM 时跑一次即可。
 
-## `apm read` 输出
+### `apm read`
 
-无内容的段会省略。顺序：
+无参数。会话开始时执行一次，拿到三段上下文：
 
-1. `# 角色`、`# 持久记忆`、`# 动态记忆`（正文已去 YAML front matter）
-2. `# 联想区`（用三段记忆正文检索 `docs/` 与 `.apm/archive/`）
+1. **规则区**：`docs/apm/RULE.md` 的全文。
+2. **最近记忆区**：`docs/apm/memory/` 下最近 5 条记忆的摘要，按 front matter 的 `date` 降序排列。每条给标题、日期、关键词、摘要。
+3. **联想区**：以 `RULE.md` 的内容作为查询上下文，**实时**搜索整个 `docs/` 目录，返回相关片段。
 
-| 联想区 | 说明 |
-|--------|------|
-| 详细区 | ≤5 条；`[匹配率%] 路径 关键词：…` + ≤3 行 `行号\|正文`（超 120 字截断）；条间空一行 |
-| 简略区 | ≤10 条；仅头部；条间无空行；与详细区间空一行 |
-| 无命中 | 不输出联想区 |
-| 无索引 | 输出提示执行 `apm index build` |
+三段之间会用标题分隔。规则区给的是「该遵守什么」，最近记忆区给的是「最近聊过什么」，联想区给的是「项目里还有哪些文档和当前规则相关」。
 
-## 命令
+联想区每次都实时扫描 `docs/` 下所有 `.md` 文件并在内存里建索引，不需要预先 `index build`。改了 `docs/` 下的文件，下一次 `apm read` 立即生效。
 
-### 记忆：`role` | `persist` | `dynamic`
+### `apm search`
 
-`show` · `write`（**无** `replace`、**无** `validate`）
+实时检索整个 `docs/` 目录下的所有 `.md` 文件：
 
 ```bash
-apm role show
-# 多行：cat <<'EOF' | apm role write --stdin
-apm role write --text "单行短句"
-# 多行：cat <<'EOF' | apm persist write --stdin
-# 多行：cat <<'EOF' | apm dynamic write --stdin
+apm search "查询内容"
+apm search "查询内容" --page 2
+apm search "查询内容" --num 20
 ```
 
-#### 正文输入：heredoc + `--stdin`（推荐）、`--text`、管道
+参数说明：
 
-- **多行首选**：`cat <<'EOF' | apm <段> write --stdin`（bash）；PowerShell 用 `@'…'@ | apm … --stdin`。
-- **`--stdin`**：从标准输入读取全文；与 `--text` 互斥。
-- **`--text <正文>`**：单行参数；支持转义 `\n` `\t` `\r` `\\`（短句可用）。
-- **管道**：未传 `--text` 且 stdin 非 TTY 时自动读 stdin，可省略 `--stdin` 标志。
+| 参数 | 含义 | 默认 |
+|------|------|------|
+| `<query>` | 查询关键词（位置参数） | 必填 |
+| `--page N` | 第几页，从 1 开始 | 1 |
+| `--num N` | 每页返回多少条 | 10 |
 
-#### 写入说明
+输出每条命中包含三部分：
 
-- 全量覆盖用 `write`；局部更新也须读出后改完整正文再 `write`（无 `replace`）。
-- 写入时不要手写 YAML front matter；若磁盘上 FM 损坏/缺失，`write` 会自愈。
+- **匹配片段**：命中的原文片段（带行号或上下文）
+- **匹配度**：该条结果与查询的相关度评分
+- **路径**：命中文件相对项目根的路径（如 `docs/apm/memory/20260814-foo-done.md`）
 
-### memory 三段 write 与 archive 快照
+同样每次实时扫描建索引，不需要预建索引，也不依赖 `.apm/config/index.gz` 之类的产物。
 
-每次 `role` / `persist` / `dynamic` 的 **`write`** 会将**本次落盘全文**（含 YAML front matter）同时写入目标文件与分层 archive 快照；快照与目标文件**完全相同**（存新版，非覆盖前的旧版）。
+---
 
-| 路径模式（相对 `.apm/archive/`） | 说明 |
-|------------------------|------|
-| `{yyyy}/{MM}/{dd}/role/{HHmmssSSS}.md` | role write 快照 |
-| `{yyyy}/{MM}/{dd}/persist/{HHmmssSSS}.md` | persist write 快照 |
-| `{yyyy}/{MM}/{dd}/dynamic/{HHmmssSSS}.md` | dynamic write 快照 |
+## 记忆文件格式
 
-| 命令 | archive 快照 |
-|------|--------------|
-| `role` / `persist` / `dynamic` **`write`** | 每次 +1 条分层快照 |
-| `dynamic write --text ""` | 目标变为空模板，仍 +1 条空模板快照 |
+每个 `docs/apm/memory/yyyyMMdd-name.md` 文件由两部分组成：YAML front matter 和正文。
 
-### 知识库与索引
+### front matter 字段
 
-```bash
-apm index build       # 扫描项目根 docs/ 与 .apm/archive/，重建 .apm/config/index.gz
+```yaml
+---
+date: yyyy-MM-dd HH:mm
+title: 记忆标题
+keywords: 关键词1, 关键词2
+abstract: 摘要内容
+---
 ```
 
-- **无独立 search 命令**：检索结果通过 `apm read` 的联想区输出。
-- **无** `kb dynamic`：知识库正文直接编辑/复制到项目根 `docs/**/*.md`，再 `index build`。
-- 可用 Agent 写文件工具落盘 PRD/SPEC，然后 `apm index build`。
+| 字段 | 说明 |
+|------|------|
+| `date` | 这条记忆的时间，格式 `yyyy-MM-dd HH:mm`（24 小时制）。`apm read` 按它降序排最近记忆 |
+| `title` | 一句话标题，出现在最近记忆区 |
+| `keywords` | 逗号分隔的关键词，便于检索与摘要 |
+| `abstract` | 摘要，两三句话讲清这条记忆讲了什么 |
 
-| 操作 | 自动 `index build` |
-|------|--------------------|
-| `role` / `persist` / `dynamic` 的 write | 是 |
-| 直接写入/移动 `docs/` | 否（须手动 `index build`） |
+front matter 必须放在文件最前面，用 `---` 包起来。
 
-### 配置
+### 正文：user / assistant
 
-```bash
-apm config show
+front matter 之后是对话正文，用 `user:` 和 `assistant:` 两段：
+
+```markdown
+user:
+用户当时的原话或意图摘要。
+
+assistant:
+我当时的回复要点、给出的方案、达成的结论。
 ```
 
-- 输出 `initializedAt` / `updatedAt` / `lastReadAt` 三个时间戳字段。
+正文不必逐字记全，挑关键的就够了：用户问了什么、我回了什么、结论是什么。啰嗦的过程流水可以省略。
+
+### 完整示例
+
+```markdown
+---
+date: 2026-08-14 15:30
+title: foo 模块用 X 方案替代 Y
+keywords: foo, 架构决策, Y 已废弃
+abstract: 用户拍板 foo 模块改用 X 方案，Y 方案不再维护，新代码不要再依赖 Y。
+---
+
+user:
+foo 模块后面是不是就不走 Y 了？新功能我都按 X 写？
+
+assistant:
+对，Y 已经废弃了。新功能一律按 X 方案写；老代码迁移可以分批做，不阻塞新需求。RULE.md 里我也补了一条约束，后面别再引入对 Y 的新依赖。
+```
+
+---
+
+## 记忆写入方式
+
+**记忆文件由 agent 直接写到磁盘，不通过 APM 命令。** APM 不提供「write」命令，也没有 `--stdin` / `--text` 之类的入参。
+
+写一条新记忆的步骤：
+
+1. 在 `docs/apm/memory/` 下新建文件，命名 `yyyyMMdd-简短标识.md`。
+2. 按上面「记忆文件格式」写好 front matter（`date` / `title` / `keywords` / `abstract`）和 `user:` / `assistant:` 正文。
+3. 用 agent 的写文件工具落盘。完成。
+
+下一次 `apm read` 就会自动把它纳入最近记忆区，`apm search` 也能搜到它，不需要任何额外的「index build」或「refresh」步骤。
+
+`RULE.md` 也是同理：要加规则就直接编辑这个文件，存盘即生效。
+
+---
 
 ## 典型场景
 
-**恢复会话：** `apm read` → 读 `persist`（规则）与 `dynamic`（背景/目的/现状）及联想区 → 按「现状」继续；勿把 archive / Bundle 当记忆正文重写一遍。
+**会话初始化：** 进项目第一件事 `apm read`，拿到规则区（RULE.md 全文）、最近 5 条记忆摘要、以及以规则为查询的联想区。接着按规则和最近记忆继续工作。
 
-**切换或推进任务（重写 dynamic 三节）：**
+**主动回忆：** 想确认某件事以前聊过没有，或者找某个文档，用 `apm search "关键词"` 实时检索整个 `docs/`。需要更多结果就加 `--page` / `--num`。
 
-```bash
-cat <<'EOF' | apm dynamic write --stdin
-## 背景
-…
+**记录新记忆：** 一段对话有了值得留住的结论，就在 `docs/apm/memory/` 下直接写一个新文件，按格式填好 front matter 和正文。会话快结束时或者关键节点记一条，别事无巨细都记。
 
-## 目的
-…
+**更新持久规则：** 出现了跨会话仍该遵守的约定，就编辑 `docs/apm/RULE.md` 加进去；没有新规则就别动它。
 
-## 现状
-…
-EOF
-```
-
-**写入跨会话规则（persist）：** 仅在有新约定/拍板决策时；正文宜短、像规则列表，勿贴任务流水。
-
-**写入知识库单文件：**
-
-```bash
-# 直接写到项目根 docs/（Agent 写文件工具或编辑器）
-# 例：docs/Iterations/<名>/prd.md
-apm index build
-apm read
-```
+---
 
 ## 勿混淆的路径
 
 | 路径 | 用途 |
 |------|------|
-| `.apm/memory/` | CLI 外置记忆，`apm read` 使用 |
-| `.apm/archive/` | memory write 的分层快照，参与索引检索 |
-| `docs/`（项目根） | 知识库 .md，入版本控制；参与索引检索 |
-| 仓库内其他 `memory/` | 不参与 `apm read`，不要当作 `.apm` 使用 |
-
-## 故障排查
-
-| 现象 | 处理 |
-|------|------|
-| `Old .apm layout detected` | 备份后删除/替换旧 `.apm`，再 `apm init`（不支持自动迁移） |
-| `Knowledge index missing` | `apm index build` |
-| 联想区无结果 | 记忆与 docs/archive 有共同词；`index build` |
-| 改完 `docs/` 搜不到 | `apm index build` |
-| `\n` 未换行 | **改用 heredoc / here-string 传真实换行**；短句才用 `--text` + `\n` |
-| PowerShell 管道中文乱码 | 用 `@'…'@` here-string 或 `Get-Content -Encoding UTF8 -Raw`，勿直接 `$str \| apm …` |
-| `Cannot use both --text and --stdin` | 只选其一 |
+| `docs/apm/RULE.md` | 持久规则，`apm read` 规则区原样输出 |
+| `docs/apm/memory/*.md` | 对话记忆，`apm read` 取最近 5 条摘要，`apm search` 实时检索 |
+| `docs/`（项目根下其余 `.md`） | 项目文档，参与 `apm read` 联想区与 `apm search` 检索 |
+| 仓库内其他 `memory/` 目录 | 与 APM 无关，不要往里写 APM 记忆 |
+| `.apm/`（旧版运行态目录） | 新架构已移除，不再使用；若遇到旧仓库残留，按需清理 |
