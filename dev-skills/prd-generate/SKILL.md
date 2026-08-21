@@ -15,7 +15,7 @@ disable-model-invocation: true
 ## 使用说明
 
 1. **在首次 `AskQuestion` 之前，必须先完成项目探索**（不可跳过）：
-   - **APM 可用时**：主代理执行 `apm read`（联想区会根据记忆正文检索 `docs/` 与 `.apm/archive/`，覆盖相关 PRD、历史迭代与文档；仅此步可由主代理直接做）
+   - **APM 可用时**：主代理执行 `apm read`（规则区 + 最近记忆摘要；仅此步可由主代理直接做）
    - **无 APM 环境**：直接读取项目根 `docs/...` 或用户指定路径下的已有 PRD/文档；检索不足时向用户索取路径
    - **探索代码与业务现状须派遣多个子代理**（见「探索阶段」），主代理 **不得** 自行深入读代码、扫目录替代子代理
    - 主代理根据各子代理返回的 **探索报告** 汇总「现状摘要」：已有能力、缺口、可能影响范围（仅业务视角，不写技术方案）
@@ -37,7 +37,6 @@ disable-model-invocation: true
 3. 澄清完成后，生成 PRD 并写入项目根 `docs/`：
    - `docs/Iterations/<需求名称>/prd.md`
    - 直接写入 `docs/Iterations/<需求名称>/prd.md`（见 `apm-usage`；知识库就是直接写文件，没有独立的写入或导入命令）
-   - **APM 可用时**写完后执行 `apm index build`（便于 `apm read` 联想检索）；无 APM 时直写文件即可
    - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（目的/现状含 PRD 路径与「待用户确认」）
 4. `prd.md` 须符合「文档格式规范」（YAML Front Matter + 正文），默认输出轻量 PRD，正文至少包含：
    - 背景（含与现状的关系）
@@ -62,7 +61,7 @@ disable-model-invocation: true
 
 ### 主代理职责
 
-1. 基于用户描述与 `apm read`（联想区检索 `docs/` 与 `.apm/archive/`）的结果，将探索面拆为 **2–4 个互不重叠的子任务**（例如：用户入口与页面流程、核心业务模块、对外接口/配置、历史 PRD/文档）
+1. 基于用户描述与 `apm read`（规则区 + 最近记忆摘要）的结果，将探索面拆为 **2–4 个互不重叠的子任务**（例如：用户入口与页面流程、核心业务模块、对外接口/配置、历史 PRD/文档）
 2. **并行** 派遣 **2–4** 个 readonly 探索子代理（`Task`，`subagent_type: explore`，`readonly: true`），**同步等待** 全部返回
 3. 汇总各报告为「现状摘要」，再进入澄清（`AskQuestion` 或等价单问）
 4. 子代理报告有缺口或矛盾时，可补派聚焦探索（仍由子代理执行）；**补派上限 2 轮**
@@ -97,11 +96,11 @@ disable-model-invocation: true
 
 | 探索项 | 目的 | APM 辅助 |
 |--------|------|----------|
-| 相关页面/路由/入口 | 确认用户从哪进入、现有流程是什么 | `apm read`（联想区检索 `docs/` 与 `.apm/archive/`），不足时直读 `docs/` 下相关文档 |
-| 核心模块与服务 | 理解业务边界、已有能力与缺口 | `apm read`（联想区检索），不足时直读 `docs/` 下相关文档 |
-| 对外接口/事件/配置 | 判断需求是否涉及上下游或第三方 | 子代理代码探索 + `apm read` 联想区 |
-| 命名与术语 | 与用户描述对齐，减少歧义 | `apm read` 联想区 |
-| 已有 PRD/文档 | 避免重复定义、识别增量需求 | `apm read`（联想区检索 `docs/Iterations/`），不足时直读 `docs/Iterations/` |
+| 相关页面/路由/入口 | 确认用户从哪进入、现有流程是什么 | `apm read`（规则 + 最近记忆），不足时直读 `docs/` 下相关文档 |
+| 核心模块与服务 | 理解业务边界、已有能力与缺口 | `apm read`，不足时直读 `docs/` 下相关文档 |
+| 对外接口/事件/配置 | 判断需求是否涉及上下游或第三方 | 子代理代码探索 + `apm read` |
+| 命名与术语 | 与用户描述对齐，减少歧义 | `apm read` |
+| 已有 PRD/文档 | 避免重复定义、识别增量需求 | `apm read`，不足时直读 `docs/Iterations/` |
 
 ### 探索子代理 prompt 模板
 
@@ -133,13 +132,13 @@ disable-model-invocation: true
 
 ## 执行检查清单（每次都要走完）
 
-- [ ] **APM 可用时**已执行 `apm read`（联想区检索 `docs/` 与 `.apm/archive/`）（不可用时已直读 `docs/` 路径或用户指定文档）
+- [ ] **APM 可用时**已执行 `apm read`（规则区 + 最近记忆）（不可用时已直读 `docs/` 路径或用户指定文档）
 - [ ] 已派遣多个 readonly 探索子代理并 **同步等待** 全部探索报告
 - [ ] 主代理已汇总探索报告并形成现状摘要（非主代理直接读代码）
 - [ ] 探索后已按 `apm-usage` 更新 `dynamic`（及必要时 `persist`）
 - [ ] 已基于探索结论澄清关键信息（优先 `AskQuestion`；不可用时在回复中单问并等待用户回答）
 - [ ] 澄清后已按 `apm-usage` 更新记忆
-- [ ] 已生成 `docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；**APM 可用时**已 `apm index build`
+- [ ] 已生成 `docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）
 - [ ] PRD 落盘后已按 `apm-usage` 更新 `dynamic`
 - [ ] 已明确 PRD 路径并请用户最终确认
 - [ ] 用户确认后已刷新 `dynamic`「现状」

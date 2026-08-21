@@ -173,7 +173,7 @@ node_status: { ... }
 
 - 工作区干净；非 main/master
 - 用户已确认 spec；已知 Spec / PRD path（`dynamic`「背景/现状」或 Bundle 中可沿用）
-- `apm read`（联想区检索 docs/ 与 archive/；无 APM 时直接读项目根 docs/ 路径）
+- `apm read`（规则区 + 最近记忆；无 APM 时直接读项目根 docs/ 路径）
 - 读 spec Step：`phase-*`、`blocking: yes/no`
 - **记忆**：按 `apm-usage` 刷新 `dynamic`（背景=用户命令与 spec/prd 路径；目的=达 dev-ready；现状=准备拆 DAG）；仅有新跨会话规则时才改 `persist`
 

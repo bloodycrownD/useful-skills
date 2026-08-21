@@ -317,7 +317,7 @@ open → 不得 scope-ready / fix-spec-ready。
 docs/Iterations/<需求名称>/cr-fix-spec.md
 ```
 
-用户另指定则从其指定。落盘后若 APM 可用：`apm index build`。
+用户另指定则从其指定。
 
 ### fix-spec 文档结构（须遵守）
 

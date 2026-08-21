@@ -66,7 +66,7 @@ disable-model-invocation: true
 
 1. 根据用户意图判定 **bug** 或 **feature**；含糊时只问**一个**聚焦问题
 2. 确定 `<需求名称>`、`<敏捷名称>`（kebab-case）
-3. 执行 `apm read`（联想区会检索整个 docs/ 目录）
+3. 执行 `apm read`（规则区 + 最近记忆摘要）
 4. 读取父级 `docs/Iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
 5. **分支安全闸**：禁止在 `main` / `master` 直接改；工作区须干净
 
