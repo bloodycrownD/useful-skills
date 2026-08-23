@@ -111,7 +111,7 @@ spec-fix 只改 fix-spec 文档。如果本轮 must-fix 很少且改法明确—
 
 **不适用**：review / review-scope / review-full（审查独立性须保留，且审查天生要读多个文件对照）。
 
-主代理直接执行后，在 `dynamic`「现状」或汇报里标注「trivial 直接执行」，与失败兜底的「手工 spec-fix」区分。
+主代理直接执行后，在记忆文件或汇报里标注「trivial 直接执行」，与失败兜底的「手工 spec-fix」区分。
 
 ---
 
@@ -140,7 +140,7 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 
 **禁止**：not-ready 后只改一处不更新 `spec_fix_plan` / `dag_version`；宣称 ready 却未落盘 fix-spec（有 must-fix 时）。
 
-无 APM 时：用用户指定路径或对话内约定路径等价维护。
+编排状态亦可用用户指定路径或对话内约定路径等价维护。
 
 ---
 
@@ -311,7 +311,7 @@ open → 不得 scope-ready / fix-spec-ready。
 
 ## 产出路径
 
-默认（有 APM / 迭代结构时）：
+默认（有迭代结构时）：
 
 ```text
 docs/Iterations/<需求名称>/cr-fix-spec.md

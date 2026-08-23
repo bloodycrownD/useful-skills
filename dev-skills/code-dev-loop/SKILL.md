@@ -102,7 +102,7 @@ open_must_fix: []
 spec_deviations: []  # open 项阻塞 dev-ready
 ```
 
-上表落在 Context Bundle / iteration-state，**不是** `apm dynamic` 正文。
+上表落在 Context Bundle / iteration-state，**不是**记忆文件正文。
 
 **禁止**：not-ready 时只「再派一个 fix」而不更新 `wave_plan` / `dag_version`。
 
@@ -134,7 +134,7 @@ wave-7: [cr-func-ui-bridge]
 
 ## Context Bundle
 
-DAG 与编排状态（`dag_version`、`wave_plan`、`node_status`、open must-fix 等）写在 **Context Bundle** 或 `docs/.iteration-state.yaml`（无 APM 时对话内 YAML 亦可），**禁止**写入 `apm dynamic` / `persist`。记忆写法见 `apm-usage`「记忆语义」。
+DAG 与编排状态（`dag_version`、`wave_plan`、`node_status`、open must-fix 等）写在 **Context Bundle** 或 `docs/.iteration-state.yaml`（或对话内 YAML），**禁止**写入记忆文件（memory 目录与 RULE.md）。记忆写法见 `apm-usage`「记忆语义」。
 
 ### full（首轮 / dev-ready 产出）
 
@@ -172,10 +172,10 @@ node_status: { ... }
 ## 开始前
 
 - 工作区干净；非 main/master
-- 用户已确认 spec；已知 Spec / PRD path（`dynamic`「背景/现状」或 Bundle 中可沿用）
-- `apm read`（规则区 + 最近记忆；无 APM 时直接读项目根 docs/ 路径）
+- 用户已确认 spec；已知 Spec / PRD path（记忆文件或 Bundle 中可沿用）
+- 按 `apm-usage`「快速开始」读规则与最近记忆摘要
 - 读 spec Step：`phase-*`、`blocking: yes/no`
-- **记忆**：按 `apm-usage` 刷新 `dynamic`（背景=用户命令与 spec/prd 路径；目的=达 dev-ready；现状=准备拆 DAG）；仅有新跨会话规则时才改 `persist`
+- **记忆**：按 `apm-usage`「记忆语义」记录进展：同主题记忆文件追加对话轮次并刷新 `date`/`abstract`；仅当出现新的跨会话规则时才更新 `RULE.md`
 
 ---
 
@@ -205,8 +205,8 @@ node_status: { ... }
 
 1. 按 spec 步骤/模块拆 **impl + verify + cr-func**（依赖边：impl → verify → cr-func）
 2. 拓扑排序得 **wave-0…n**；`blocking: yes` 步骤须落在对应 cr-func 范围
-3. 将节点表、边、`wave_plan`、`dag_version: 1` 写入 **Context Bundle / iteration-state**（勿写 `dynamic`）
-4. 按 `apm-usage` 刷新 `dynamic`「现状」（如「已拆 DAG，进入 wave-0」）；无新规则则不动 `persist`
+3. 将节点表、边、`wave_plan`、`dag_version: 1` 写入 **Context Bundle / iteration-state**（勿写记忆文件）
+4. 按 `apm-usage`「记忆语义」记录进展（如「已拆 DAG，进入 wave-0」）：同主题记忆文件追加对话轮次并刷新 `date`/`abstract`；无新跨会话规则则不动 `RULE.md`
 
 ---
 
@@ -268,7 +268,7 @@ Context Bundle：
 1. 收集 open must-fix、failed 节点
 2. 按「动态 DAG」表改图：新增 fix、调整 wave、必要时重插 cr-func
 3. `dag_version++`，写回 Bundle / iteration-state → 回到 Step 2
-4. 刷新 `dynamic`「现状」为一两句人话（卡点 + 下一步）；勿把新 DAG 全文贴进记忆
+4. 按 `apm-usage`「记忆语义」用一两句人话记录现状（卡点 + 下一步）；勿把新 DAG 全文贴进记忆
 
 ---
 
@@ -310,13 +310,13 @@ spec_deviations: []
 
 ## 执行检查清单
 
-- [ ] 用户已确认 spec（`dynamic` 现状或 Bundle 可沿用）
-- [ ] 初始 DAG **含 cr-func 节点与边**，且状态在 Bundle / iteration-state（非 dynamic）
+- [ ] 用户已确认 spec（记忆文件或 Bundle 可沿用）
+- [ ] 初始 DAG **含 cr-func 节点与边**，且状态在 Bundle / iteration-state（非记忆文件）
 - [ ] 无冲突节点已尝试 **wave 并行**
 - [ ] trivial 节点已由主代理直接执行并标 `executor: main`（验证仍照常执行）
 - [ ] not-ready 已 **重编排**（dag_version 递增）
 - [ ] fix 后已重跑 verify + cr-func
-- [ ] 阶段推进已按 `apm-usage` 刷新 `dynamic`（背景/目的/现状）
+- [ ] 阶段推进已按 `apm-usage` 记忆语义更新记忆
 - [ ] dev-ready 时未自称 merge-ready
 
 ---

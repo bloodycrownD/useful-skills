@@ -38,7 +38,7 @@ disable-model-invocation: true
 
 一次完整的：**子代理 readonly 审查 → 主代理汇总 →（若未 ready）派遣 doc-fix 子代理并同步等待，或满足 trivial 豁免时主代理直接闭合 → 下一轮。无论走子代理还是直接执行，都算同一轮内的事，闭合后 `review_round +1`**。
 
-轮次从 1 开始；当前轮次与上轮 must-fix 闭合情况写在 **iteration-state**，`dynamic`「现状」只用一两句人话概括。
+轮次从 1 开始；当前轮次与上轮 must-fix 闭合情况写在 **iteration-state**，记忆文件里只用一两句人话概括现状。
 
 ### 同步等待
 
@@ -94,11 +94,11 @@ doc_fix_plan: [[spec-§3], [prd-验收, spec-测试]]  # wave 计划；完成后
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | execute-ready 已确认
 ```
 
-上表落在 iteration-state / 对话 YAML，**不是** `apm dynamic` 正文。记忆写法见 `apm-usage`。
+上表落在 iteration-state / 对话 YAML，**不是**记忆文件正文。记忆写法见 `apm-usage`。
 
 **禁止**：No-Go 后只改一处不更新 `doc_fix_plan` / `dag_version` / 不进入下轮审查。
 
-无 APM 时：用 `docs/.iteration-state.yaml` 或对话内 YAML 块等价维护**编排状态**；`dynamic` 仍按「背景 / 目的 / 现状」维护（可无 APM 时写在同一文件旁白或对话内）。
+用 `docs/.iteration-state.yaml` 或对话内 YAML 块等价维护**编排状态**。
 
 ---
 
@@ -106,10 +106,10 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 
 - 已知：`PRD path`、`SPEC path`（至少 SPEC；仅有 PRD 时须先补齐 spec 或标明 SPEC 待写）
 - 已知：仓库根路径、迭代名称（如 `agent-run-lifecycle-unify`）
-- 若项目使用 APM：`apm read`（规则区 + 最近记忆）（workspace 不完整时仍可手工读项目根 `docs/...`）
+- 已按 `apm-usage`「快速开始」读规则与最近记忆（workspace 不完整时仍可手工读项目根 `docs/...`）
 - **不要求**工作区干净（本阶段只改文档）；若同时改代码则偏离本 skill
 
-**准备完成**：按 `apm-usage` 刷新 `dynamic`（背景=文档路径与用户意图；目的=达 execute-ready；现状=待首轮审查）。编排状态写入 iteration-state，勿塞进记忆槽。
+**准备完成**：按 `apm-usage`「记忆语义」记录进展（同主题记忆文件追加轮次并刷新 `date`/`abstract`，一句话概括「文档审查循环待首轮审查」）。编排状态写入 iteration-state，勿塞进记忆文件。
 
 ---
 
@@ -253,7 +253,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - **修复后同步 PRD 与 SPEC**（验收、命名、契约一致）
 - 大改契约时检查 `dependency` 前置 PRD 是否需同步一句
 
-**修复完成**：主代理更新 iteration-state（轮次、闭合列表）；按 `apm-usage` 刷新 `dynamic`「现状」。已拍板且跨任务仍有效的契约可写入 `persist`。
+**修复完成**：主代理更新 iteration-state（轮次、闭合列表）；按 `apm-usage`「记忆语义」更新同主题记忆文件（追加轮次并刷新 `date`/`abstract`）。已拍板且跨任务仍有效的契约可写入 `RULE.md`。
 
 ---
 
@@ -276,7 +276,7 @@ must-fix 清单（须在本 wave 内闭合）：
 - 「接受某 P1 风险开工」→ 写入 SPEC 后可为 ready，须用户显式说
 - 「停止循环」→ 汇报当前 No-Go 项后结束
 
-**用户确认 execute-ready 后**：按 `apm-usage` 刷新 `dynamic`「现状」（execute-ready 已确认）；已确认要点若跨任务仍有效可写入 `persist`。
+**用户确认 execute-ready 后**：按 `apm-usage`「记忆语义」更新记忆（现状=execute-ready 已确认）；已确认要点若跨任务仍有效可写入 `RULE.md`。
 
 ---
 
@@ -292,7 +292,7 @@ must-fix 清单（须在本 wave 内闭合）：
 
 ## 阶段记忆更新（APM）
 
-遵守 **`apm-usage`「记忆语义」**。轮次、`doc_fix_plan`、must-fix 清单属编排状态，写 iteration-state；`dynamic` 只用背景 / 目的 / 现状描述当前任务。勿自造字段表。
+遵守 **`apm-usage`「记忆语义」**。轮次、`doc_fix_plan`、must-fix 清单属编排状态，写 iteration-state；记忆文件只用一两句人话描述当前任务进展。勿自造字段表。
 
 ---
 
@@ -303,7 +303,7 @@ must-fix 清单（须在本 wave 内闭合）：
 **doc-fix 子代理失败**（超时、资源）：
 
 1. 短暂停顿后重试一次
-2. 仍失败：主代理可手工完成 doc-fix，但须同样闭合 must-fix，并在 `dynamic`「现状」注明「手工 doc-fix」
+2. 仍失败：主代理可手工完成 doc-fix，但须同样闭合 must-fix，并在记忆文件中注明「手工 doc-fix」
 3. 资源恢复后优先回到子代理流程
 
 **多轮震荡**（同一 P0 反复出现）：停止自动循环，请用户拍板二选一写进 SPEC。
@@ -315,16 +315,16 @@ must-fix 清单（须在本 wave 内闭合）：
 - [ ] 已读 PRD + SPEC + dependency 前置
 - [ ] 每轮已派 readonly 审查子代理并 **同步等待**
 - [ ] 审查含代码库对照，非空泛文档互审
-- [ ] not-ready 时已派 doc-fix 子代理并 **同步等待**；若满足 trivial 豁免（见「子代理派遣规范 · trivial 豁免」）可由主代理直接执行，须在 `dynamic`「现状」注明
+- [ ] not-ready 时已派 doc-fix 子代理并 **同步等待**；若满足 trivial 豁免（见「子代理派遣规范 · trivial 豁免」）可由主代理直接执行，须在记忆文件中注明
 - [ ] P0 闭合后才可宣称 execute-ready
 - [ ] 未在用户确认前开始编码
-- [ ] 已按 `apm-usage` 更新 `dynamic`（及必要时 `persist`）
+- [ ] 已按 `apm-usage` 记忆语义更新记忆
 
 ---
 
 ## 完成产出（execute-ready 后）
 
-用户确认后，在 **Context Bundle / iteration-state** 保留可供后续使用的素材（用户或后续任务自行取用，本 skill 不强制指定下游步骤）；`dynamic`「现状」用一两句指向这些路径即可，勿把整段 YAML 贴进记忆：
+用户确认后，在 **Context Bundle / iteration-state** 保留可供后续使用的素材（用户或后续任务自行取用，本 skill 不强制指定下游步骤）；记忆文件用一两句指向这些路径即可，勿把整段 YAML 贴进记忆：
 
 ```yaml
 spec_path: ...

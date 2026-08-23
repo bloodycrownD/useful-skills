@@ -1,35 +1,47 @@
 ---
 name: apm-usage
-description: APM（Agent Persistence Memory）使用指南：用 apm init 初始化、apm read 读取规则与最近记忆。记忆由 agent 直接写文件到 docs/apm/memory/，不通过 APM 命令；持久规则维护在 docs/apm/RULE.md。在提到 apm、外置记忆、会话恢复，或需要按统一约定记录对话记忆时使用。本文件为记忆「写什么、怎么读」的唯一权威，其它 skill 不得另立字段表或目录约定。
+description: APM（Agent Persistence Memory）记忆约定：外置记忆就是 docs/apm/ 目录本身，没有 CLI、没有服务。RULE.md 存持久规则，memory/ 下 yyyyMMdd-name.md 存多轮对话记忆，全部由 agent 直接读写。会话开始按本文件的初始化片段读规则与最近记忆。在提到 apm、外置记忆、会话恢复，或需要按统一约定记录对话记忆时使用。本文件为记忆「写什么、怎么读」的唯一权威，其它 skill 不得另立字段表或目录约定。
 disable-model-invocation: true
 ---
 
-# APM 使用指南
+# APM 记忆约定
 
-对应 CLI：`agent-persistence-memory`（`apm`）。
-
-APM 现在只做两件事：初始化目录、读取规则与最近记忆。记忆文件由 agent 直接写到磁盘上，不走 APM 命令。整体围绕一个 `docs/apm/` 目录展开，不再有 `.apm/` 运行态目录。
+APM 不是工具，是一份**目录与文件约定**：没有 CLI、没有服务、没有索引，记忆就是 `docs/apm/` 下的一堆 markdown 文件，跟着项目一起进版本控制。agent 用自己现成的文件读写和 shell 能力操作它们，本文件只负责规定「长什么样、怎么读、怎么写」。
 
 ## 快速开始
 
-```bash
-apm init                # 在项目根初始化 docs/apm/（幂等，已存在不报错）
-apm read                # 会话开始必做：规则区 + 最近记忆
-# … 执行任务 …
+会话开始时（在项目根执行）：
 
-# 记录一条新记忆：agent 直接写文件到 docs/apm/memory/，不走 APM 命令
-#   文件名：yyyyMMdd-简短标识.md，例如 docs/apm/memory/20260814-foo-done.md
+```bash
+# 1. 读持久规则（文件不存在就跳过）
+cat docs/apm/RULE.md
+
+# 2. 最近 5 条记忆的摘要（按 front matter date 降序，输出文件路径 + front matter）
+for f in docs/apm/memory/*.md; do
+  [ -e "$f" ] || continue
+  d=$(grep -m1 '^date:' "$f" | sed 's/^date:[[:space:]]*//')
+  printf '%s\t%s\n' "$d" "$f"
+done | sort -r | head -5 | cut -f2- | xargs -I{} sed -n '1,6p' {}
 ```
 
-- 在**项目根目录**执行命令；`docs/apm/` 就建在这里。
-- 入口：`apm`（或 `npx apm`；源码仓库需先 `npm run build`）。
-- 记忆文件由 agent 用写文件工具直接落盘，APM 不提供「写入」命令。
+powershell 等价片段：
+
+```powershell
+Get-ChildItem docs/apm/memory/*.md | ForEach-Object {
+  $d = (Select-String -Path $_ -Pattern '^date:\s*(.+)$' | Select-Object -First 1).Matches[0].Groups[1].Value
+  [PSCustomObject]@{ Date = $d; File = $_ }
+} | Sort-Object Date -Descending | Select-Object -First 5 | ForEach-Object {
+  Get-Content $_.File | Select-Object -First 6
+}
+```
+
+看完摘要想读某条完整记忆，按路径直接读那个文件就好。之后…执行任务，值得记的东西直接写文件（格式见下）。
 
 ---
 
 ## 记忆语义
 
-APM 把记忆分成两层，两层都落在 `docs/apm/` 里，跟着项目一起进版本控制。
+记忆分两层，都落在 `docs/apm/` 里。
 
 ### RULE.md：持久规则（类 AGENTS.md）
 
@@ -45,7 +57,7 @@ RULE.md 由 agent 直接维护：有新规则就整理进去，没有就别动�
 
 ### memory 文件：带时间的对话记忆
 
-`docs/apm/memory/` 下的每个 `.md` 文件是一条**对话记忆**，文件名形如 `yyyyMMdd-简短标识.md`。它记录的是某次具体的交流——用户问了什么、我回了什么、当时的关键结论是什么。文件靠 front matter 的 `date` 排序，`apm read` 会取最近的几条做摘要。
+`docs/apm/memory/` 下的每个 `.md` 文件是一条**对话记忆**，文件名形如 `yyyyMMdd-简短标识.md`。它记录的是某次具体的交流——用户问了什么、我回了什么、当时的关键结论是什么。文件靠 front matter 的 `date` 排序，会话初始化片段取最近 5 条做摘要。
 
 记忆文件适合写：
 
@@ -57,7 +69,7 @@ RULE.md 由 agent 直接维护：有新规则就整理进去，没有就别动�
 
 ---
 
-## 目录结构
+## 目录结构与初始化
 
 ```
 docs/
@@ -65,43 +77,22 @@ docs/
     RULE.md          # 持久规则，agent 直接维护
     memory/          # 对话记忆目录
       yyyyMMdd-name.md
-      .gitkeep       # apm init 创建，保证空目录能进版本控制
+      .gitkeep       # 保证空目录能进版本控制
 ```
 
-- `docs/apm/RULE.md`：持久规则，`apm read` 的规则区会原样输出它。
-- `docs/apm/memory/*.md`：每条一个文件，`apm read` 取最近 5 条做摘要。
-- 不再有 `.apm/` 目录，也不再有 role/persist/dynamic 之分；持久规则统一在 `RULE.md`，对话记忆统一在 `memory/`。
-- APM 不扫描 `docs/apm/` 以外的内容；需要项目里其它 `.md` 文档时，agent 直接按路径读取。
-
----
-
-## 命令详解
-
-只有两个命令：`apm init`、`apm read`。没有 role/persist/dynamic/write/show/index/config/search。
-
-### `apm init`
-
-幂等地初始化记忆目录：
+新项目第一次接入时，agent 直接创建骨架（幂等，已存在不覆盖）：
 
 ```bash
-apm init
+mkdir -p docs/apm/memory
+touch docs/apm/RULE.md docs/apm/memory/.gitkeep
 ```
 
-它会创建：
+- `docs/apm/RULE.md`：持久规则，会话初始化时原样读它。
+- `docs/apm/memory/*.md`：每条记忆一个文件，初始化片段取最近 5 条摘要。
+- 没有 `.apm/` 目录，也没有 role/persist/dynamic 之分；持久规则统一在 `RULE.md`，对话记忆统一在 `memory/`。
+- 约定只覆盖 `docs/apm/`；项目里其它 `.md` 文档与 APM 无关，agent 需要时直接按路径读取。
 
-- `docs/apm/RULE.md`（若不存在，给一个可写的初始模板）
-- `docs/apm/memory/.gitkeep`
-
-已经存在的文件不会被覆盖，重复执行也不报错。新项目第一次接入 APM 时跑一次即可。
-
-### `apm read`
-
-无参数。会话开始时执行一次，拿到两段上下文：
-
-1. **规则区**：`docs/apm/RULE.md` 的全文。
-2. **最近记忆区**：`docs/apm/memory/` 下最近 5 条记忆的摘要，按 front matter 的 `date` 降序排列。每条给标题、日期、摘要和文件路径。
-
-两段之间会用标题分隔。规则区给的是「该遵守什么」，最近记忆区给的是「最近聊过什么」。想看某条记忆的完整内容，按输出里的路径直接读那个文件就好。
+> 历史：APM 曾是一个 npm CLI（`apm init` / `apm read` / `apm search`），2026-08 退役。旧仓库里的 `.apm/` 目录已废弃，遇到残留按需清理。
 
 ---
 
@@ -122,8 +113,8 @@ abstract: 摘要内容
 
 | 字段 | 说明 |
 |------|------|
-| `date` | 这条记忆的时间，格式 `yyyy-MM-dd HH:mm`（24 小时制）。`apm read` 按它降序排最近记忆 |
-| `title` | 一句话标题，出现在最近记忆区 |
+| `date` | 这条记忆的时间，格式 `yyyy-MM-dd HH:mm`（24 小时制）。初始化片段按它降序排最近记忆 |
+| `title` | 一句话标题，出现在最近记忆摘要里 |
 | `keywords` | 逗号分隔的关键词，便于检索与摘要 |
 | `abstract` | 摘要，两三句话讲清这条记忆讲了什么 |
 
@@ -182,7 +173,7 @@ assistant:
 
 写新记忆前先做一次查重，别让 memory 目录里堆满重复条目：
 
-1. **写前先查**：用 `apm read` 看最近记忆；最近 5 条里没有、但怀疑更早记过，就直接浏览 `docs/apm/memory/` 的文件名（带日期和主题标识）或读可疑文件确认。
+1. **写前先查**：按初始化片段看最近记忆；最近 5 条里没有、但怀疑更早记过，就直接浏览 `docs/apm/memory/` 的文件名（带日期和主题标识）或读可疑文件确认。
 2. **同主题更新而非新建**：如果已有同主题的记忆文件，优先**更新那个文件**——追加新的对话轮次、刷新 `date` 和 `abstract`——而不是新建一个重复的文件。
 3. **一个主题一个文件**：同一天对同一件事的多次讨论，合并进同一个记忆文件，靠多轮 `user:` / `assistant:` 展开，不要每次讨论都单开一个文件。
 4. **只记增量**：写记忆时如果发现新结论和旧记忆部分重叠，只补充新增加的部分，不复述已经记过的内容。`abstract` 重写为覆盖全貌的一句话，但正文只追加增量轮次。
@@ -191,16 +182,14 @@ assistant:
 
 ## 记忆写入方式
 
-**记忆文件由 agent 直接写到磁盘，不通过 APM 命令。** APM 不提供「write」命令，也没有 `--stdin` / `--text` 之类的入参。
+**记忆文件由 agent 用写文件工具直接落盘**，没有任何命令、也不需要任何构建步骤。
 
 写一条新记忆的步骤：
 
-1. **查重**：`apm read` 看最近记忆，必要时浏览 `docs/apm/memory/` 目录，确认没有同主题的已有记忆；有则走「更新已有文件」（见「避免重复与冗余」）。
+1. **查重**：看最近记忆摘要，必要时浏览 `docs/apm/memory/` 目录，确认没有同主题的已有记忆；有则走「更新已有文件」（见「避免重复与冗余」）。
 2. 在 `docs/apm/memory/` 下新建文件，命名 `yyyyMMdd-简短标识.md`。
 3. 按上面「记忆文件格式」写好 front matter（`date` / `title` / `keywords` / `abstract`）和多轮 `user:` / `assistant:` 正文。
-4. 用 agent 的写文件工具落盘。完成。
-
-下一次 `apm read` 就会自动把它纳入最近记忆区，不需要任何额外的「index build」或「refresh」步骤。
+4. 落盘即完成，下一次会话初始化自动纳入最近记忆。
 
 `RULE.md` 也是同理：要加规则就直接编辑这个文件，存盘即生效。
 
@@ -208,9 +197,9 @@ assistant:
 
 ## 典型场景
 
-**会话初始化：** 进项目第一件事 `apm read`，拿到规则区（RULE.md 全文）和最近 5 条记忆摘要。接着按规则和最近记忆继续工作。
+**会话初始化：** 进项目第一件事按「快速开始」片段读 RULE.md 和最近 5 条记忆摘要。接着按规则和最近记忆继续工作。
 
-**主动回忆：** 想确认某件事以前聊过没有，先看 `apm read` 的最近记忆；时间更久的，按 `docs/apm/memory/` 下的文件名定位，再直接读文件。记忆文件的 front matter 里有 `keywords` 和 `abstract`，扫一眼就能判断是不是要找的那条。
+**主动回忆：** 想确认某件事以前聊过没有，先看最近记忆摘要；时间更久的，按 `docs/apm/memory/` 下的文件名定位，或用 `grep -il "关键词" docs/apm/memory/*.md` 搜正文，再直接读命中文件。记忆文件的 front matter 里有 `keywords` 和 `abstract`，扫一眼就能判断是不是要找的那条。
 
 **记录新记忆：** 一段对话有了值得留住的结论，先查一下同主题是否已有记忆——有就更新那个文件（追加轮次、刷新 date/abstract），没有再新建。会话快结束时或者关键节点记一条，别事无巨细都记，也别把同一件事反复记成多个文件。
 
@@ -222,8 +211,8 @@ assistant:
 
 | 路径 | 用途 |
 |------|------|
-| `docs/apm/RULE.md` | 持久规则，`apm read` 规则区原样输出 |
-| `docs/apm/memory/*.md` | 对话记忆，`apm read` 取最近 5 条摘要 |
-| `docs/`（项目根下其余 `.md`） | 项目文档，与 APM 无关，agent 需要时直接读 |
-| 仓库内其他 `memory/` 目录 | 与 APM 无关，不要往里写 APM 记忆 |
-| `.apm/`（旧版运行态目录） | 新架构已移除，不再使用；若遇到旧仓库残留，按需清理 |
+| `docs/apm/RULE.md` | 持久规则，会话初始化原样读取 |
+| `docs/apm/memory/*.md` | 对话记忆，初始化取最近 5 条摘要 |
+| `docs/`（项目根下其余 `.md`） | 项目文档，与本约定无关，agent 需要时直接读 |
+| 仓库内其他 `memory/` 目录 | 与本约定无关，不要往里写 APM 记忆 |
+| `.apm/`（旧版运行态目录） | 已废弃；若遇到旧仓库残留，按需清理 |

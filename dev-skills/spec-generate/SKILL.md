@@ -18,18 +18,18 @@ disable-model-invocation: true
 
 1. 先读取需求文档：
    - 默认：`docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；若 `dependency` 非空，一并读取所列前置 PRD
-   - **非标准输入**（用户口述、自定义路径）：以用户指定路径为准；`dynamic`「背景」记录需求路径（口述时可记「用户口述」）
-   - **APM 可用时**：`apm read`（规则区 + 最近记忆摘要）获取相关历史方案与上下文（仅此步可由主代理直接做）
-   - **无 APM 环境**：直读项目根 `docs/...` 或 `requirement_path`
-   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（背景含需求路径；目的=产出可确认的 spec）
+   - **非标准输入**（用户口述、自定义路径）：以用户指定路径为准；需求路径记入同主题 memory 文件（口述时可记「用户口述」）
+   - 项目已接入 `apm-usage` 约定（存在 `docs/apm/`）时：主代理按 `apm-usage`「快速开始」读规则与最近记忆摘要，获取相关历史方案与上下文（仅此步可由主代理直接做）
+   - 未接入约定时：直读项目根 `docs/...` 或 `requirement_path`
+   - **阶段完成**：按 `apm-usage`「记忆语义」把需求路径与目标（产出可确认的 spec）以一两句人话记入同主题 memory 文件
 2. **在生成 `spec.md` 之前，必须先完成代码探索**（不可跳过）：
-   - 主代理基于需求文档（`requirement_path`）列出可能涉及的文件、模块、接口，并用 `apm read`（规则区 + 最近记忆；或直读 `docs/`）补充检索相关 spec、变更记录与模块文档（仅此步可由主代理直接做）
+   - 主代理基于需求文档（`requirement_path`）列出可能涉及的文件、模块、接口，并按 `apm-usage`「快速开始」（规则 + 最近记忆；或直读 `docs/`）补充检索相关 spec、变更记录与模块文档（仅此步可由主代理直接做）
    - **深入阅读代码、确认实现与约束须派遣多个子代理**（见「探索阶段」），主代理 **不得** 自行深入读代码、扫目录替代子代理
    - 主代理根据各子代理返回的 **探索报告** 汇总：影响范围、兼容性风险、技术边界、关键模块映射
-   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`「现状」；可跨会话复用的约束/模块边界写入 `persist`
+   - **阶段完成**：按 `apm-usage`「记忆语义」把探索结论记入同主题 memory 文件；可跨会话复用的约束/模块边界写入 `RULE.md`
 3. 完成代码探索后，再生成方案文档并写入知识库：
    - `docs/Iterations/<需求名称>/spec.md`
-   - **阶段完成**：按 `apm-usage` 刷新 `dynamic`（现状含 spec 路径与「待用户确认」）
+   - **阶段完成**：按 `apm-usage`「记忆语义」把 spec 路径与「待用户确认」记入同主题 memory 文件
 4. `spec.md` 须符合「文档格式规范」（YAML Front Matter + 正文），且必须基于真实代码上下文，不允许只依据需求文本做“空中方案”。
 5. SPEC 正文必须面向实现，至少包含：
    - 总体实现思路与架构
@@ -46,7 +46,7 @@ disable-model-invocation: true
    - 测试用例 id 格式 `T-<模块缩写><序号>`（如 `T-W1`）；每条 T 须能映射到至少一个 Step
    - `blocking: yes`：该步骤为交付硬门槛
    - `qa: manual_user`：真机/录屏等，标注为合并后用户验收，**不**作为自动门禁阻塞项
-8. 落盘后请求用户确认 `spec.md`；**确认后**：按 `apm-usage` 刷新 `dynamic`「现状」（已确认）；已拍板且跨任务仍有效的方案要点可写入 `persist`。
+8. 落盘后请求用户确认 `spec.md`；**确认后**：按 `apm-usage`「记忆语义」把「已确认」记入同主题 memory 文件；已拍板且跨任务仍有效的方案要点可写入 `RULE.md`。
 9. 探索报告摘要可写入 **Context Bundle**（见下），供后续实现参考；**探索不构成跳过 impl 子代理的依据**。
 
 ## 探索阶段（生成 spec 之前必做）
@@ -69,7 +69,7 @@ disable-model-invocation: true
 | 工具 | `Task`，`subagent_type: explore` |
 | readonly | **true** |
 | 并行 | 2–4 个，同步等待 |
-| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，写入 `dynamic`「现状」 |
+| 失败 | 重试一次 → 主代理手工 readonly 探索，标注「手工探索」，记入 memory 文件（人话短句） |
 
 ### 主代理禁止
 
@@ -113,7 +113,7 @@ disable-model-invocation: true
 禁止修改任何文件。
 ```
 
-探索报告摘要写入 Context Bundle 与 `dynamic`「现状」（人话短句，勿贴全文）；`spec.md` 中的变更点与实现步骤须能追溯到探索报告中的证据。`persist` 仅记可跨会话复用的约束/边界。详见 `apm-usage`。
+探索报告摘要写入 Context Bundle，并以人话短句记入同主题 memory 文件（勿贴全文）；`spec.md` 中的变更点与实现步骤须能追溯到探索报告中的证据。仅当出现可跨会话复用的约束/边界时才更新 `RULE.md`。详见 `apm-usage`。
 
 ## Context Bundle（可选，供后续实现参考）
 
@@ -131,28 +131,27 @@ blocking_steps: [...]
 
 ## 阶段记忆更新
 
-遵守 **`apm-usage`「记忆语义」**。每阶段结束重写 `dynamic` 三节；仅当有新跨会话规则时改 `persist`。勿自造字段表，勿把探索/验证流水堆进记忆。
+遵守 **`apm-usage`「记忆语义」**（唯一权威）。每阶段结束把进展（探索摘要、spec 路径、确认态）以一两句人话写进对应主题的 memory 文件（追加轮次、刷新 `date`/`abstract`）；仅当出现新的跨会话规则（术语、能力边界、已拍板决策）时才更新 `RULE.md`。勿自造字段表，勿把探索/验证流水堆进记忆。
 
-- **无 APM 环境**：可用 `docs/.iteration-state.yaml` 或对话内等价维护，语义相同。
+- 编排状态可用 `docs/.iteration-state.yaml` 或对话内 YAML 维护。
 
 ## 环境与工具 fallback
 
-- **无 APM 环境**：知识库直读项目根 `docs/...` 或 `requirement_path`；spec 落盘直写等价路径；记忆见「阶段记忆更新」与 `apm-usage`
-- 下列 **`apm` 命令仅在 APM 可用时执行**；不可用时以读/写文件与 `docs/.iteration-state.yaml`（或对话内状态）为准
+- 项目未接入约定（不存在 `docs/apm/`）时：直读项目根 `docs/...` 或 `requirement_path`；spec 落盘直写等价路径；记忆见「阶段记忆更新」与 `apm-usage`
 
 ## 执行检查清单（每次都要走完）
 
 - [ ] 已读取需求文档（默认 `prd.md` 或 `requirement_path`）；标准 PRD 时已校验 Front Matter 并读取 `dependency` 所列前置 PRD（如有）
-- [ ] **APM 可用时**已 `apm read`（规则区 + 最近记忆）（不可用时已直读 `docs/` 或 `requirement_path`）
-- [ ] 需求读取后已按 `apm-usage` 更新 `dynamic`
+- [ ] 已按 `apm-usage`「快速开始」读规则与最近记忆（项目未接入约定时已直读 `docs/` 或 `requirement_path`）
+- [ ] 需求读取后已按 `apm-usage` 记忆语义更新记忆
 - [ ] 已派遣多个 readonly 探索子代理并 **同步等待** 全部探索报告
 - [ ] 主代理已汇总探索报告（影响范围、现状约束、关键模块映射；非主代理直接读代码）
 - [ ] 探索后已按 `apm-usage` 更新记忆
 - [ ] 已在方案中体现现状约束与影响分析
 - [ ] 已生成 `docs/Iterations/<需求名称>/spec.md`（含 YAML Front Matter：`date`）
-- [ ] spec 落盘后已按 `apm-usage` 更新 `dynamic`
+- [ ] spec 落盘后已按 `apm-usage` 记忆语义更新记忆（spec 路径与待确认态入 memory 文件）
 - [ ] 已请求用户确认 `spec.md`
-- [ ] 用户确认后已刷新 `dynamic`「现状」（及必要时 `persist`）
+- [ ] 用户确认后已按 `apm-usage` 记忆语义更新记忆（进展入 memory 文件，新跨会话规则入 `RULE.md`）
 
 ## 文档格式规范
 
