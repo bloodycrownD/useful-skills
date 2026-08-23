@@ -17,7 +17,7 @@ disable-model-invocation: true
 ## 使用说明
 
 1. 先读取需求文档：
-   - 默认：`docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；若 `dependency` 非空，一并读取所列前置 PRD
+   - 默认：`docs/iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）；若 `dependency` 非空，一并读取所列前置 PRD
    - **非标准输入**（用户口述、自定义路径）：以用户指定路径为准；需求路径记入同主题 memory 文件（口述时可记「用户口述」）
    - 项目已接入 `apm-usage` 约定（存在 `docs/apm/`）时：主代理按 `apm-usage`「快速开始」读规则与最近记忆摘要，获取相关历史方案与上下文（仅此步可由主代理直接做）
    - 未接入约定时：直读项目根 `docs/...` 或 `requirement_path`
@@ -28,7 +28,7 @@ disable-model-invocation: true
    - 主代理根据各子代理返回的 **探索报告** 汇总：影响范围、兼容性风险、技术边界、关键模块映射
    - **阶段完成**：按 `apm-usage`「记忆语义」把探索结论记入同主题 memory 文件；可跨会话复用的约束/模块边界写入 `RULE.md`
 3. 完成代码探索后，再生成方案文档并写入知识库：
-   - `docs/Iterations/<需求名称>/spec.md`
+   - `docs/iterations/<需求名称>/spec.md`
    - **阶段完成**：按 `apm-usage`「记忆语义」把 spec 路径与「待用户确认」记入同主题 memory 文件
 4. `spec.md` 须符合「文档格式规范」（YAML Front Matter + 正文），且必须基于真实代码上下文，不允许只依据需求文本做“空中方案”。
 5. SPEC 正文必须面向实现，至少包含：
@@ -148,7 +148,7 @@ blocking_steps: [...]
 - [ ] 主代理已汇总探索报告（影响范围、现状约束、关键模块映射；非主代理直接读代码）
 - [ ] 探索后已按 `apm-usage` 更新记忆
 - [ ] 已在方案中体现现状约束与影响分析
-- [ ] 已生成 `docs/Iterations/<需求名称>/spec.md`（含 YAML Front Matter：`date`）
+- [ ] 已生成 `docs/iterations/<需求名称>/spec.md`（含 YAML Front Matter：`date`）
 - [ ] spec 落盘后已按 `apm-usage` 记忆语义更新记忆（spec 路径与待确认态入 memory 文件）
 - [ ] 已请求用户确认 `spec.md`
 - [ ] 用户确认后已按 `apm-usage` 记忆语义更新记忆（进展入 memory 文件，新跨会话规则入 `RULE.md`）

@@ -87,8 +87,8 @@ doc-fix 改的是 PRD/SPEC 文档。如果本轮 must-fix 很少且改法明确�
 ```yaml
 dag_version: 1
 review_round: 2
-prd_path: docs/Iterations/<name>/prd.md
-spec_path: docs/Iterations/<name>/spec.md
+prd_path: docs/iterations/<name>/prd.md
+spec_path: docs/iterations/<name>/spec.md
 open_must_fix: []
 doc_fix_plan: [[spec-§3], [prd-验收, spec-测试]]  # wave 计划；完成后置 []
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | execute-ready 已确认

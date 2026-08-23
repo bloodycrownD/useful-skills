@@ -35,8 +35,8 @@ disable-model-invocation: true
    - **`AskQuestion` 不可用时**：在回复中只提**一个**聚焦问题，等用户回答后再继续下一轮澄清（规则同上）
    - **阶段完成**：按 `apm-usage`「记忆语义」记录进展（同主题记忆文件追加轮次并刷新 `date`/`abstract`）；用户拍板且跨任务仍有效的决策可写入 `RULE.md`
 3. 澄清完成后，生成 PRD 并写入项目根 `docs/`：
-   - `docs/Iterations/<需求名称>/prd.md`
-   - 直接写入 `docs/Iterations/<需求名称>/prd.md`，无需任何命令
+   - `docs/iterations/<需求名称>/prd.md`
+   - 直接写入 `docs/iterations/<需求名称>/prd.md`，无需任何命令
    - **阶段完成**：按 `apm-usage`「记忆语义」把 PRD 路径与「待用户确认」以一两句人话记入同主题 memory 文件
 4. `prd.md` 须符合「文档格式规范」（YAML Front Matter + 正文），默认输出轻量 PRD，正文至少包含：
    - 背景（含与现状的关系）
@@ -100,7 +100,7 @@ disable-model-invocation: true
 | 核心模块与服务 | 理解业务边界、已有能力与缺口 | 规则 + 最近记忆，不足时直读 `docs/` 下相关文档 |
 | 对外接口/事件/配置 | 判断需求是否涉及上下游或第三方 | 子代理代码探索 + 规则与最近记忆（`apm-usage` 初始化片段） |
 | 命名与术语 | 与用户描述对齐，减少歧义 | `apm-usage` 初始化片段（规则 + 最近记忆） |
-| 已有 PRD/文档 | 避免重复定义、识别增量需求 | 规则 + 最近记忆，不足时直读 `docs/Iterations/` |
+| 已有 PRD/文档 | 避免重复定义、识别增量需求 | 规则 + 最近记忆，不足时直读 `docs/iterations/` |
 
 ### 探索子代理 prompt 模板
 
@@ -137,7 +137,7 @@ disable-model-invocation: true
 - [ ] 探索后已按 `apm-usage` 记忆语义更新记忆（进展入 memory 文件，新跨会话规则入 `RULE.md`）
 - [ ] 已基于探索结论澄清关键信息（优先 `AskQuestion`；不可用时在回复中单问并等待用户回答）
 - [ ] 澄清后已按 `apm-usage` 更新记忆
-- [ ] 已生成 `docs/Iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）
+- [ ] 已生成 `docs/iterations/<需求名称>/prd.md`（含 YAML Front Matter：`date`、`dependency`）
 - [ ] PRD 落盘后已按 `apm-usage` 记忆语义更新记忆（PRD 路径与待确认态入 memory 文件）
 - [ ] 已明确 PRD 路径并请用户最终确认
 - [ ] 用户确认后已把「已确认」记入 memory 文件
@@ -157,9 +157,9 @@ disable-model-invocation: true
 `dependency` 示例：
 
 - 无前置：`dependency: []`
-- 单个前置：`dependency: Iterations/<前置需求>/prd.md`
-- 多个前置：`dependency: [Iterations/<需求A>/prd.md, Iterations/<需求B>/prd.md]`
-- feature 级变更：`dependency: Iterations/<需求名称>/prd.md`（指向父级 PRD）
+- 单个前置：`dependency: iterations/<前置需求>/prd.md`
+- 多个前置：`dependency: [iterations/<需求A>/prd.md, iterations/<需求B>/prd.md]`
+- feature 级变更：`dependency: iterations/<需求名称>/prd.md`（指向父级 PRD）
 
 探索阶段若发现前置需求，须在澄清时与用户确认 `dependency` 取值后再落盘。
 

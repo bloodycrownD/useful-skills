@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # 敏捷开发
 
-在**已有迭代**（`Iterations/<需求名称>/`）内做轻量、快速的代码交付：先摸清上下文，再派子代理改代码，**代码完成并验证通过后**在 `bugs/` 或 `features/` 下补充 `prd.md` 与 `spec.md` 留痕。
+在**已有迭代**（`iterations/<需求名称>/`）内做轻量、快速的代码交付：先摸清上下文，再派子代理改代码，**代码完成并验证通过后**在 `bugs/` 或 `features/` 下补充 `prd.md` 与 `spec.md` 留痕。
 
 本 skill 特点：**先实现、后文档**，适合迭代内小步快跑。
 
@@ -49,10 +49,10 @@ disable-model-invocation: true
 
 | 产物 | 路径 |
 |------|------|
-| PRD | `docs/Iterations/<需求名称>/bugs\|features/<敏捷名称>/prd.md` |
-| SPEC | `docs/Iterations/<需求名称>/bugs\|features/<敏捷名称>/spec.md` |
+| PRD | `docs/iterations/<需求名称>/bugs\|features/<敏捷名称>/prd.md` |
+| SPEC | `docs/iterations/<需求名称>/bugs\|features/<敏捷名称>/spec.md` |
 
-- `<需求名称>`：所属迭代（与 `Iterations/` 下目录一致）；无法确定时询问用户
+- `<需求名称>`：所属迭代（与 `iterations/` 下目录一致）；无法确定时询问用户
 - `<敏捷名称>`：简短 kebab-case 标识（如 `login-timeout-on-refresh`、`export-csv-button`）
 
 ### 输入来源
@@ -67,7 +67,7 @@ disable-model-invocation: true
 1. 根据用户意图判定 **bug** 或 **feature**；含糊时只问**一个**聚焦问题
 2. 确定 `<需求名称>`、`<敏捷名称>`（kebab-case）
 3. 按 `apm-usage`「快速开始」读规则与最近记忆摘要
-4. 读取父级 `docs/Iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
+4. 读取父级 `docs/iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
 5. **分支安全闸**：禁止在 `main` / `master` 直接改；工作区须干净
 
 **阶段完成**：更新 `docs/apm/memory/` 下的记忆文件（用人话记录类型、敏捷名称、父级路径等背景与进度）。
@@ -231,7 +231,7 @@ disable-model-invocation: true
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `date` | string | 是 | `YYYY-MM-DD` |
-| `dependency` | string \| string[] | 是 | 父级 PRD：`Iterations/<需求名称>/prd.md`；无则 `[]` |
+| `dependency` | string \| string[] | 是 | 父级 PRD：`iterations/<需求名称>/prd.md`；无则 `[]` |
 
 ### spec.md Front Matter
 
@@ -247,7 +247,7 @@ disable-model-invocation: true
 ```markdown
 ---
 date: YYYY-MM-DD
-dependency: Iterations/<需求名称>/prd.md
+dependency: iterations/<需求名称>/prd.md
 ---
 
 # <敏捷名称> Bug PRD
@@ -274,7 +274,7 @@ dependency: Iterations/<需求名称>/prd.md
 ```markdown
 ---
 date: YYYY-MM-DD
-dependency: Iterations/<需求名称>/prd.md
+dependency: iterations/<需求名称>/prd.md
 ---
 
 # <敏捷名称> Feature PRD

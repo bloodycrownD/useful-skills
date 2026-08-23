@@ -1,8 +1,8 @@
 ---
-date: 2026-08-23 21:30
+date: 2026-08-23 22:30
 title: APM 从 CLI 退役为纯约定，skill 文档同步迁移新口径
-keywords: apm, 退役, 纯约定, apm-usage, prd-generate, spec-generate, agile-dev, brain-storm, code-dev-loop, code-review-loop, spec-check-loop, 记忆语义
-abstract: APM 从 npm CLI 整体退役为纯约定：外置记忆就是 docs/apm/（RULE.md + memory/），无命令无服务，apm-usage/SKILL.md 重写为唯一权威（含 bash/powershell 初始化片段与记忆语义）。八个 skill 分两批迁到新口径：第一批 prd-generate 与 spec-generate，第二批 agile-dev、brain-storm、code-dev-loop、code-review-loop、spec-check-loop，均把 apm read 改为按「快速开始」读规则与最近记忆、合并 APM 可用/无 APM 二分、清掉 dynamic/persist 三段式说法，换成「同主题记忆文件追加轮次并刷新 date/abstract，新跨会话规则才更新 RULE.md」，两批约 grep 自查无残留。
+keywords: apm, 退役, 纯约定, apm-usage, prd-generate, spec-generate, agile-dev, brain-storm, code-dev-loop, code-review-loop, spec-check-loop, 记忆语义, iterations
+abstract: APM 从 npm CLI 整体退役为纯约定：外置记忆就是 docs/apm/（RULE.md + memory/），无命令无服务，apm-usage/SKILL.md 重写为唯一权威（含 bash/powershell 初始化片段与记忆语义）。八个 skill 迁到新口径：apm read 改为按「快速开始」读规则与最近记忆、合并 APM 可用/无 APM 二分、清掉 dynamic/persist 三段式说法，换成「同主题记忆文件追加轮次并刷新 date/abstract，新跨会话规则才更新 RULE.md」。后续迭代目录约定从 docs/Iterations/ 改为小写 docs/iterations/，五个 skill 同步。CLI 已 npm rm -g 卸载，两仓库均已 push。
 ---
 
 user:
@@ -42,3 +42,9 @@ user:
 
 assistant:
 五个文件改完，grep 自查 apm read/apm init/apm search/apm index/dynamic/persist/APM 可用/无 APM/archive/.apm/ 零命中。agile-dev：Step 1 与检查清单两处 apm read 改为「快速开始」读法。brain-storm：删「无 APM 时勿尝试 apm 命令 fallback」；「APM 可用时可额外 apm read」改为「已接入 apm-usage 约定（存在 docs/apm/）时按其快速开始读」；记忆小节的 dynamic/persist 两条改为记忆文件追加轮次 + RULE.md 仅新跨会话规则才更新。code-dev-loop：「不是 apm dynamic 正文」改「不是记忆文件正文」；Context Bundle 禁止写入对象改为记忆文件（memory 目录与 RULE.md），括注改「（或对话内 YAML）」；开始前/Step 1/Step 3/检查清单的记忆说法全部换新语义。code-review-loop：trivial 标注位置从 dynamic「现状」改为记忆文件；「无 APM 时：用用户指定路径…」删前缀保留等价维护编排状态；「默认（有 APM / 迭代结构时）」改「默认（有迭代结构时）」。spec-check-loop：「不是 apm dynamic 正文」改「不是记忆文件正文」；无 APM 句删 dynamic 半句，保留用 docs/.iteration-state.yaml 或对话内 YAML 维护编排状态；「若项目使用 APM：apm read」改按快速开始读；准备完成/修复完成/用户确认后/失败处理/检查清单全部换新语义，persist 写入对象改 RULE.md。
+
+user:
+对了，改写 prd generate 的 Iterations 为小写 iteration
+
+assistant:
+改 prd-generate 时发现 spec-generate / agile-dev / code-review-loop / spec-check-loop 也引用同一个 docs/Iterations/ 目录约定，只改一个会导致路径分裂，所以五个 skill 一起统一为小写 docs/iterations/（含 dependency 示例）。替换后大写 Iterations 零残留，已同步 ~/.agents/skills。
