@@ -1,43 +1,12 @@
 ---
-name: apm-usage
-description: APM（Agent Persistence Memory）记忆约定：外置记忆就是 docs/apm/ 目录本身，没有 CLI、没有服务。RULE.md 存持久规则，memory/ 下 yyyyMMdd-name.md 存多轮对话记忆，全部由 agent 直接读写。会话开始按本文件的初始化片段读规则与最近记忆。在提到 apm、外置记忆、会话恢复，或需要按统一约定记录对话记忆时使用。本文件为记忆「写什么、怎么读」的唯一权威，其它 skill 不得另立字段表或目录约定。
+name: apm-record
+description: APM（Agent Persistence Memory）记忆写入侧：把对话结论落盘为 docs/apm/memory/ 下的多轮对话记忆（yyyyMMdd-name.md：front matter + user/assistant 正文），维护 docs/apm/RULE.md 持久规则；写前查重、同主题追加轮次而非新建文件。没有 CLI、没有服务，agent 用写文件工具直接落盘。在记录对话记忆、更新 RULE.md，或其它 skill 提到「记忆语义」「按 apm-record 落盘」时使用。目录结构、记忆文件格式与写路径以本文件为唯一权威，其它 skill 不得另立字段表或目录约定；读侧（会话初始化、主动回忆）见 apm-recall。
 disable-model-invocation: true
 ---
 
-# APM 记忆约定
+# APM 记忆记录（Record）
 
-APM 不是工具，是一份**目录与文件约定**：没有 CLI、没有服务、没有索引，记忆就是 `docs/apm/` 下的一堆 markdown 文件，跟着项目一起进版本控制。agent 用自己现成的文件读写和 shell 能力操作它们，本文件只负责规定「长什么样、怎么读、怎么写」。
-
-## 快速开始
-
-会话开始时（在项目根执行）：
-
-```bash
-# 1. 读持久规则（文件不存在就跳过）
-cat docs/apm/RULE.md
-
-# 2. 最近 5 条记忆的摘要（按 front matter date 降序，输出文件路径 + front matter）
-for f in docs/apm/memory/*.md; do
-  [ -e "$f" ] || continue
-  d=$(grep -m1 '^date:' "$f" | sed 's/^date:[[:space:]]*//')
-  printf '%s\t%s\n' "$d" "$f"
-done | sort -r | head -5 | cut -f2- | xargs -I{} sed -n '1,6p' {}
-```
-
-powershell 等价片段：
-
-```powershell
-Get-ChildItem docs/apm/memory/*.md | ForEach-Object {
-  $d = (Select-String -Path $_ -Pattern '^date:\s*(.+)$' | Select-Object -First 1).Matches[0].Groups[1].Value
-  [PSCustomObject]@{ Date = $d; File = $_ }
-} | Sort-Object Date -Descending | Select-Object -First 5 | ForEach-Object {
-  Get-Content $_.File | Select-Object -First 6
-}
-```
-
-看完摘要想读某条完整记忆，按路径直接读那个文件就好。之后…执行任务，值得记的东西直接写文件（格式见下）。
-
----
+APM 的记忆就是 `docs/apm/` 下的 markdown 文件，跟着项目一起进版本控制。本文件负责**怎么写**：写什么进哪一层、什么格式、怎么查重。读侧（会话初始化、主动回忆）见 `apm-recall`。
 
 ## 记忆语义
 
@@ -57,7 +26,7 @@ RULE.md 由 agent 直接维护：有新规则就整理进去，没有就别动�
 
 ### memory 文件：带时间的对话记忆
 
-`docs/apm/memory/` 下的每个 `.md` 文件是一条**对话记忆**，文件名形如 `yyyyMMdd-简短标识.md`。它记录的是某次具体的交流——用户问了什么、我回了什么、当时的关键结论是什么。文件靠 front matter 的 `date` 排序，会话初始化片段取最近 5 条做摘要。
+`docs/apm/memory/` 下的每个 `.md` 文件是一条**对话记忆**，文件名形如 `yyyyMMdd-简短标识.md`。它记录的是某次具体的交流——用户问了什么、我回了什么、当时的关键结论是什么。文件靠 front matter 的 `date` 排序，会话初始化（见 `apm-recall`「快速开始」）取最近 5 条做摘要。
 
 记忆文件适合写：
 
@@ -113,7 +82,7 @@ abstract: 摘要内容
 
 | 字段 | 说明 |
 |------|------|
-| `date` | 这条记忆的时间，格式 `yyyy-MM-dd HH:mm`（24 小时制）。初始化片段按它降序排最近记忆 |
+| `date` | 这条记忆的时间，格式 `yyyy-MM-dd HH:mm`（24 小时制）。`apm-recall` 的初始化片段按它降序排最近记忆 |
 | `title` | 一句话标题，出现在最近记忆摘要里 |
 | `keywords` | 逗号分隔的关键词，便于检索与摘要 |
 | `abstract` | 摘要，两三句话讲清这条记忆讲了什么 |
@@ -173,7 +142,7 @@ assistant:
 
 写新记忆前先做一次查重，别让 memory 目录里堆满重复条目：
 
-1. **写前先查**：按初始化片段看最近记忆；最近 5 条里没有、但怀疑更早记过，就直接浏览 `docs/apm/memory/` 的文件名（带日期和主题标识）或读可疑文件确认。
+1. **写前先查**：按 `apm-recall`「快速开始」看最近记忆；最近 5 条里没有、但怀疑更早记过，就直接浏览 `docs/apm/memory/` 的文件名（带日期和主题标识）或读可疑文件确认。
 2. **同主题更新而非新建**：如果已有同主题的记忆文件，优先**更新那个文件**——追加新的对话轮次、刷新 `date` 和 `abstract`——而不是新建一个重复的文件。
 3. **一个主题一个文件**：同一天对同一件事的多次讨论，合并进同一个记忆文件，靠多轮 `user:` / `assistant:` 展开，不要每次讨论都单开一个文件。
 4. **只记增量**：写记忆时如果发现新结论和旧记忆部分重叠，只补充新增加的部分，不复述已经记过的内容。`abstract` 重写为覆盖全貌的一句话，但正文只追加增量轮次。
@@ -195,15 +164,13 @@ assistant:
 
 ---
 
-## 典型场景
-
-**会话初始化：** 进项目第一件事按「快速开始」片段读 RULE.md 和最近 5 条记忆摘要。接着按规则和最近记忆继续工作。
-
-**主动回忆：** 想确认某件事以前聊过没有，先看最近记忆摘要；时间更久的，按 `docs/apm/memory/` 下的文件名定位，或用 `grep -il "关键词" docs/apm/memory/*.md` 搜正文，再直接读命中文件。记忆文件的 front matter 里有 `keywords` 和 `abstract`，扫一眼就能判断是不是要找的那条。
+## 典型场景（写侧）
 
 **记录新记忆：** 一段对话有了值得留住的结论，先查一下同主题是否已有记忆——有就更新那个文件（追加轮次、刷新 date/abstract），没有再新建。会话快结束时或者关键节点记一条，别事无巨细都记，也别把同一件事反复记成多个文件。
 
 **更新持久规则：** 出现了跨会话仍该遵守的约定，就编辑 `docs/apm/RULE.md` 加进去；没有新规则就别动它。
+
+（会话初始化与主动回忆是读侧场景，见 `apm-recall`。）
 
 ---
 
@@ -211,8 +178,8 @@ assistant:
 
 | 路径 | 用途 |
 |------|------|
-| `docs/apm/RULE.md` | 持久规则，会话初始化原样读取 |
-| `docs/apm/memory/*.md` | 对话记忆，初始化取最近 5 条摘要 |
-| `docs/`（项目根下其余 `.md`） | 项目文档，与本约定无关，agent 需要时直接读 |
+| `docs/apm/RULE.md` | 持久规则，agent 直接维护 |
+| `docs/apm/memory/*.md` | 对话记忆，每条一个文件 |
+| `docs/`（项目根下其余 `.md`） | 项目文档，与本约定无关，勿往里写 APM 内容 |
 | 仓库内其他 `memory/` 目录 | 与本约定无关，不要往里写 APM 记忆 |
-| `.apm/`（旧版运行态目录） | 已废弃；若遇到旧仓库残留，按需清理 |
+| `.apm/`（旧版运行态目录） | 已废弃，勿写入 |

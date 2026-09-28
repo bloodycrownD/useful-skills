@@ -66,7 +66,7 @@ disable-model-invocation: true
 
 1. 根据用户意图判定 **bug** 或 **feature**；含糊时只问**一个**聚焦问题
 2. 确定 `<需求名称>`、`<敏捷名称>`（kebab-case）
-3. 按 `apm-usage`「快速开始」读规则与最近记忆摘要
+3. 按 `apm-recall`「快速开始」读规则与最近记忆摘要
 4. 读取父级 `docs/iterations/<需求名称>/prd.md`（及已有 `spec.md` 若存在）
 5. **分支安全闸**：禁止在 `main` / `master` 直接改；工作区须干净
 
@@ -336,7 +336,7 @@ agile_trace: true
 ## 执行检查清单
 
 - [ ] 已判定 bug / feature，并确定需求名称与敏捷名称
-- [ ] 已读父级 PRD，已按 `apm-usage`「快速开始」读规则与最近记忆
+- [ ] 已读父级 PRD，已按 `apm-recall`「快速开始」读规则与最近记忆
 - [ ] 已派遣 readonly 探索子代理并同步等待；主代理已汇总探索结论
 - [ ] 已在非保护分支实现（子代理 inline，或轻量直改由主代理直接实现并已验证）
 - [ ] 针对性测试与 build 已通过

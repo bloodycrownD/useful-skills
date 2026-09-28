@@ -101,7 +101,7 @@ doc_fix_plan: [spec-§3, prd-验收, spec-测试]  # 主代理按序直改；完
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | execute-ready 已确认
 ```
 
-上表落在 iteration-state / 对话 YAML，**不是**记忆文件正文。记忆写法见 `apm-usage`。
+上表落在 iteration-state / 对话 YAML，**不是**记忆文件正文。记忆写法见 `apm-record`。
 
 **禁止**：No-Go 后只改一处不更新 `doc_fix_plan` / `dag_version` / 不进入下轮审查。
 
@@ -113,10 +113,10 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 
 - 已知：`PRD path`、`SPEC path`（至少 SPEC；仅有 PRD 时须先补齐 spec 或标明 SPEC 待写）
 - 已知：仓库根路径、迭代名称（如 `agent-run-lifecycle-unify`）
-- 已按 `apm-usage`「快速开始」读规则与最近记忆（workspace 不完整时仍可手工读项目根 `docs/...`）
+- 已按 `apm-recall`「快速开始」读规则与最近记忆（workspace 不完整时仍可手工读项目根 `docs/...`）
 - **不要求**工作区干净（本阶段只改文档）；若同时改代码则偏离本 skill
 
-**准备完成**：按 `apm-usage`「记忆语义」记录进展（同主题记忆文件追加轮次并刷新 `date`/`abstract`，一句话概括「文档审查循环待首轮审查」）。编排状态写入 iteration-state，勿塞进记忆文件。
+**准备完成**：按 `apm-record`「记忆语义」记录进展（同主题记忆文件追加轮次并刷新 `date`/`abstract`，一句话概括「文档审查循环待首轮审查」）。编排状态写入 iteration-state，勿塞进记忆文件。
 
 ---
 
@@ -223,7 +223,7 @@ not ready 时，主代理按 `doc_fix_plan` **直接编辑 PRD/SPEC** 闭合本�
 - **修复后同步 PRD 与 SPEC**（验收、命名、契约一致）
 - 大改契约时检查 `dependency` 前置 PRD 是否需同步一句
 
-**修复完成**：主代理更新 iteration-state（轮次、闭合列表）；按 `apm-usage`「记忆语义」更新同主题记忆文件（追加轮次并刷新 `date`/`abstract`）。已拍板且跨任务仍有效的契约可写入 `RULE.md`。
+**修复完成**：主代理更新 iteration-state（轮次、闭合列表）；按 `apm-record`「记忆语义」更新同主题记忆文件（追加轮次并刷新 `date`/`abstract`）。已拍板且跨任务仍有效的契约可写入 `RULE.md`。
 
 ---
 
@@ -246,7 +246,7 @@ not ready 时，主代理按 `doc_fix_plan` **直接编辑 PRD/SPEC** 闭合本�
 - 「接受某 P1 风险开工」→ 写入 SPEC 后可为 ready，须用户显式说
 - 「停止循环」→ 汇报当前 No-Go 项后结束
 
-**用户确认 execute-ready 后**：按 `apm-usage`「记忆语义」更新记忆（现状=execute-ready 已确认）；已确认要点若跨任务仍有效可写入 `RULE.md`。
+**用户确认 execute-ready 后**：按 `apm-record`「记忆语义」更新记忆（现状=execute-ready 已确认）；已确认要点若跨任务仍有效可写入 `RULE.md`。
 
 ---
 
@@ -262,7 +262,7 @@ not ready 时，主代理按 `doc_fix_plan` **直接编辑 PRD/SPEC** 闭合本�
 
 ## 阶段记忆更新（APM）
 
-遵守 **`apm-usage`「记忆语义」**。轮次、`doc_fix_plan`、must-fix 清单属编排状态，写 iteration-state；记忆文件只用一两句人话描述当前任务进展。勿自造字段表。
+遵守 **`apm-record`「记忆语义」**。轮次、`doc_fix_plan`、must-fix 清单属编排状态，写 iteration-state；记忆文件只用一两句人话描述当前任务进展。勿自造字段表。
 
 ---
 
@@ -282,7 +282,7 @@ not ready 时，主代理按 `doc_fix_plan` **直接编辑 PRD/SPEC** 闭合本�
 - [ ] not-ready 时主代理已直接 doc-fix 闭合 must-fix（只改文档，未动实现代码）
 - [ ] P0 闭合后才可宣称 execute-ready
 - [ ] 未在用户确认前开始编码
-- [ ] 已按 `apm-usage` 记忆语义更新记忆
+- [ ] 已按 `apm-record` 记忆语义更新记忆
 
 ---
 
