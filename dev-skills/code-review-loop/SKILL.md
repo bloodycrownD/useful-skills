@@ -1,6 +1,6 @@
 ---
 name: code-review-loop
-description: 对照 PRD/spec 与 diff 做代码评审 DAG，not-ready 时由子代理完善可执行 fix-spec（不改实现代码），循环直至 fix-spec-ready。含 scope/full/diff 模式。用户提及 CR loop、code review loop、产出修复 spec、评审后给执行 spec 时使用。
+description: 对照 PRD/spec 与 diff 做代码评审 DAG，not-ready 时由主代理直接完善可执行 fix-spec（单文件文档改动，不派子代理、不改实现代码），循环直至 fix-spec-ready。含 scope/full/diff 模式。用户提及 CR loop、code review loop、产出修复 spec、评审后给执行 spec 时使用。
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 **评审 → 完善可执行 spec** skill：对照 **PRD + spec**（及 diff 范围）做质量评审，将 must-fix 收敛进一份 **fix-spec**；not-ready 时只改 fix-spec，再 CR。终点 **fix-spec-ready**（可交给 code-dev-loop / 实现任务执行）。
 
-主代理 = 编排；子代理 = **review**（readonly）/ **spec-fix**（只改 fix-spec）。中文协作。
+主代理 = 编排 + **spec-fix**（直接完善 fix-spec）；子代理 = **review**（readonly，非自审）。中文协作。
 
 本 skill **不改实现代码、不跑 verify/cleanup、不宣称可合并**。
 
@@ -52,7 +52,7 @@ disable-model-invocation: true
 
 ### 审查轮（review round）
 
-一次完整的：**readonly 评审 → 主代理汇总 →（若未 ready）派遣 spec-fix 并同步等待 → 下一轮**。
+一次完整的：**readonly 评审 → 主代理汇总 →（若未 ready）主代理直改 fix-spec → 下一轮**。
 
 ### 编排收敛（C-orch）
 
@@ -70,9 +70,10 @@ disable-model-invocation: true
 ## 主代理禁止
 
 - **自审**：review* 须 readonly 子代理
-- **自改 fix-spec**：spec-fix 须 Task 子代理；主代理不得直接编辑闭合 must-fix（trivial 豁免除外，见「子代理派遣规范 · trivial 豁免」）
 - **改实现 / 跑门禁**：不得在本 skill 内改代码、跑 verify/lint 代替下游执行
-- **not-ready 时口头收尾**：不得只描述改法而不派 spec-fix；须更新 `spec_fix_plan` 并 `dag_version++`
+- **not-ready 时口头收尾**：不得只描述改法而不落盘 fix-spec；须更新 `spec_fix_plan` 并 `dag_version++`
+
+spec-fix 本就是主代理职责（单文件文档直改，见「子代理派遣规范 · spec-fix：主代理直接执行」），不在禁止之列。
 
 ---
 
@@ -93,25 +94,41 @@ review* **须 readonly**。波次内功能小检（func）属 **code-dev-loop**�
 | 节点 | 工具 | subagent_type | readonly | 说明 |
 |------|------|---------------|----------|------|
 | **review** / **review-scope** / **review-full** | Task | generalPurpose | **true** | 非自审 |
-| **spec-fix** | Task（默认）；trivial 时主代理直接执行（见下） | generalPurpose | false | **只改 fix-spec**（及用户指定的文档路径） |
+| **evidence**（可选，大对象） | Task | generalPurpose | **true** | 按模块并行；**只取证不下结论** |
 
 - 同 wave 无冲突可并行；**同步等待** 当前 wave 全部返回后再汇总
-- **同文件禁止** 并行 spec-fix
-- **失败**：重试一次 → 仍失败则主代理可手工等效 spec-fix，标注「手工 spec-fix」。注意这与下文 trivial 豁免不同：失败兜底用于子代理跑挂的应急，trivial 豁免用于本来就不值得派子代理的轻量改动。
+- **失败**：review / evidence 子代理重试一次；仍失败则主代理手工等效审查，标注「手工审查」
 
-### trivial 豁免（主代理直接执行）
+### 大对象两段式评审（evidence → review）
 
-**trivial** 指本轮 must-fix 很少且改法明确——主代理写几行就能闭合，既不需要上下文隔离、又不需要并行——的情况。
+diff 大、跨模块对照多时，多个 review-scope 各自重读全量代码很浪费，而且跨模块问题谁也看不见全貌。可拆两段：
 
-spec-fix 只改 fix-spec 文档。如果本轮 must-fix 很少且改法明确——写几行就完——主代理直接改 fix-spec 更快，不必派子代理。
+1. **evidence**（wave-1，并行 readonly）：按模块取证落盘证据包——spec 声明、代码现状、diff 变更点、可疑点（含 file:line），**只取证不下结论**
+2. **review**（wave-2，单个 readonly）：读全部证据包，并**按 file:line 回读关键代码**后产出 must-fix 与结论
 
-判据是 **主代理直接执行不会消耗主代理大量上下文**：must-fix 条目少、位置已知（fix-spec 章节明确）、不需要读大量代码来措辞。拿不准时，以「预估 ≤3 次工具调用（含读文件、搜索、跑测试等）」作为兜底倾向主代理直接执行。
+约束：裁决的 review **禁止仅凭证据包判 must-fix**（证据包是索引不是替代）；模块可独立判断时仍用 review-scope 并行；小 diff 直接 review，不拆两段。
 
-这是对「主代理禁止」里 spec-fix 须子代理的显式例外——该禁止默认成立，仅当上述判据全部满足时才可由主代理直接执行。
+### 证据包（evidence pack）
 
-**不适用**：review / review-scope / review-full（审查独立性须保留，且审查天生要读多个文件对照）。
+跨轮次重复读的**稳定背景**落盘复用，**生产者写、消费者读**：
 
-主代理直接执行后，在记忆文件或汇报里标注「trivial 直接执行」，与失败兜底的「手工 spec-fix」区分。
+- 生产者：第一个读该区域的子代理（evidence / 首轮 review）顺手落盘，路径写入 Context Bundle；主代理只持路径，**不亲自写包**——否则读代码的成本只是转移到了最贵的主代理上下文上
+- 路径：`docs/iterations/<name>/cache/<topic>.md`（过程产物，不入版本控制；用户另指定则从其指定）
+- 失效：包头记 `head_sha` / 生成节点 / 范围；后续节点发现 sha 不一致 → 视为 stale，仅作线索，事实须新鲜读
+- 边界：只放稳定背景（模块地图、调用链、约定、既往 findings、diff 统计）；**被审的当前 diff 与代码必须新鲜读**
+
+### spec-fix：主代理直接执行
+
+spec-fix 只改 fix-spec **单个文档**，而 must-fix 已由 review 子代理带回「文件、改法、验收」——主代理在汇总后直接落盘即可，既不需要上下文隔离、也不需要并行，**不派子代理**。
+
+执行时逐条自检：
+
+- 只编辑 fix-spec（及用户明确允许的文档），不动实现代码
+- 每条含：id、严重度、维度、文件、问题、改法、验收/测试、来源
+- P0 必须写入；P1/P2 全部写入除非用户已豁免
+- 同步元信息中的 round / sha；状态保持 draft 直至主代理宣布 ready
+
+若个别 must-fix 改法存疑、须读大量代码查证，可派一个 readonly 子代理先行查证，fix-spec 本身仍由主代理编辑。
 
 ---
 
@@ -123,18 +140,19 @@ not-ready 后 **改图**，`dag_version++`：
 |------|------|
 | 并行 review-scope | 不同模块同 wave |
 | 合并 review | 多模块同类 → 一次 review-scope |
-| 并行 / 合并 spec-fix | 无同文件冲突的章节同 wave；同章合并 |
-| 优先 P0 | 阻塞条目进下一 wave 首部 |
+| 两段式拆分 | diff 大且跨模块对照多 → wave-1 并行 evidence 取证 → wave-2 单 review 读包裁决 |
+| spec-fix 直改 | 主代理在 wave 间把 must-fix 落盘 fix-spec；单文件串行，不占派遣 wave |
+| 优先 P0 | 阻塞条目排在 spec-fix 直改最前 |
 | 插入 review-full | 各 scope-ready 且 fix-spec 草案齐后 |
 
 ```yaml
 dag_version: 1
 review_round: 2
-wave_plan: [[review-scope-a, review-scope-b], [spec-fix-p0], [review-full]]
-node_status: { review-scope-a: done, spec-fix-p0: pending }
+wave_plan: [[review-scope-a, review-scope-b], [review-full]]   # spec-fix 不占 wave，主代理在 wave 间直改
+node_status: { review-scope-a: done, review-scope-b: pending }
 must_fix: []   # open 项；须含 id, P0|P1|P2, 文件, 维度, 改法, 来源 node_id
 fix_spec_path: docs/iterations/<name>/cr-fix-spec.md
-spec_fix_plan: [[fix-spec-§P0], [fix-spec-§P1]]
+spec_fix_plan: [fix-spec-§P0, fix-spec-§P1]  # 主代理按序直改；完成后置 []
 status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 | fix-spec-ready 已确认
 ```
 
@@ -148,7 +166,7 @@ status: 待下轮审查  # 待首轮审查 | 待下轮审查 | 待用户确认 |
 
 ```text
 review-scope-*（并行）
-  → spec-fix-*（把 must-fix 写入/完善 fix-spec）
+  → 主代理 spec-fix（把 must-fix 写入/完善 fix-spec；直改单文件，不派子代理）
   → review-scope-* 或 review-full（校验 fix-spec 覆盖与可执行性）
   → … 循环 …
   → fix-spec-ready（结论态，非波次节点）
@@ -247,16 +265,16 @@ open → 不得 scope-ready / fix-spec-ready。
 ```text
 准备 → 读 PRD/spec/diff → 初始评审 DAG → 确定 fix_spec_path
   → loop:
-      取就绪 wave → 并行派子代理 → 同步等待 → 更新 node_status
+      取就绪 wave → 并行派 review 子代理 → 同步等待 → 更新 node_status
       → fix-spec-ready? ─是→ Fix-Spec Closure → 请用户确认 → 结束
-      → not-ready? ─→ 拆 spec-fix wave（dag_version++）→ 继续
+      → not-ready? ─→ 主代理直改 fix-spec（dag_version++）→ 继续
 ```
 
 **轮次上限**：默认 **5**；仍 not-ready 时汇报未闭合项，请用户拍板。
 
 同一 must-fix 震荡 ≥3 次 → **blocked**。
 
-**diff**：单轮 readonly 评审 →（有 must-fix 则）派 spec-fix 落盘 → 汇总三态；可不进入多轮 scope DAG。
+**diff**：单轮 readonly 评审 →（有 must-fix 则）主代理直接落盘 fix-spec → 汇总三态；可不进入多轮 scope DAG。
 
 ---
 
@@ -281,9 +299,9 @@ open → 不得 scope-ready / fix-spec-ready。
 
 ---
 
-## Step 3：spec-fix（仅 not-ready）
+## Step 3：spec-fix（仅 not-ready；主代理直接执行）
 
-主代理按 `spec_fix_plan` 派 **spec-fix** 子代理，**只改 fix-spec**（及用户明确允许的文档），把本轮 must-fix 写成可执行条目。
+主代理按 `spec_fix_plan` **直接编辑 fix-spec**（及用户明确允许的文档），把本轮 must-fix 写成可执行条目——单文件文档改动，不派子代理，要点见「子代理派遣规范 · spec-fix：主代理直接执行」。
 
 完成后：`spec_fix_plan` 置空、状态「待下轮审查」、`review_round++`，回到 Step 2。
 
@@ -364,10 +382,9 @@ spec_path: <业务 spec 或「未提供」>
 prd_path: <或「未提供」>
 fix_spec_path: <路径>
 prior_conclusion: <上轮结论，首轮 none>
+evidence_packs: [<路径>]   # 可选；两段式或跨轮复用，见「证据包」
 must_fix: []
 ```
-
-spec-fix 用 **delta**：本轮新增/仍开放 must-fix、目标章节、`fix_spec_path`。
 
 ---
 
@@ -421,32 +438,6 @@ Context Bundle：<YAML>
 7）结论：建议 fix-spec-ready: yes|no + 理由（由主代理最终判定）
 ```
 
-### spec-fix
-
-```text
-【语言要求】全程中文
-
-节点：spec-fix-<id>。只改文档，不改实现代码。
-仓库：<PATH>
-fix-spec 路径：<FIX_SPEC_PATH>（不存在则创建，结构见 skill「fix-spec 文档结构」）
-业务 Spec / PRD：<路径>（只读参考；除非用户允许，勿改业务 spec）
-本 wave 范围：<章节/严重度>
-
-must-fix（须写入或修订进 fix-spec）：
-- <条目>
-
-约束：
-- 只编辑 fix-spec（及用户明确允许的文档）
-- 每条含：id、严重度、维度、文件、问题、改法、验收/测试、来源
-- P0 必须写入；P1/P2 全部写入除非用户已豁免
-- 同步元信息中的 round / sha；状态保持 draft 直至主代理宣布 ready
-
-请用中文返回：
-1）修改的文件与章节
-2）各 must-fix：已写入 / 仍开放 / 需拍板
-3）阻塞项（如有）
-```
-
 ### diff
 
 ```text
@@ -469,7 +460,7 @@ K 节：只给出应写入 fix-spec 的收尾步骤，不跑 lint
    - 阻塞：未闭合 P0，或 open spec_deviations，或调查未完成
 ```
 
-**diff 收尾**（主代理）：需产出 / 阻塞且用户未叫停 → 派 **spec-fix** 落盘；通过则 Closure 注明无修复项。
+**diff 收尾**（主代理）：需产出 / 阻塞且用户未叫停 → 主代理直接落盘 fix-spec；通过则 Closure 注明无修复项。
 
 ---
 
@@ -493,7 +484,7 @@ K 节：只给出应写入 fix-spec 的收尾步骤，不跑 lint
 
 - [ ] 已读 PRD + 业务 spec + diff 范围；已定 `fix_spec_path`
 - [ ] review* 已派 readonly 子代理；主代理未自审
-- [ ] not-ready 已派 spec-fix（非主代理直改；未改实现代码）
+- [ ] not-ready 时主代理已直接完善 fix-spec（未改实现代码）
 - [ ] Context Bundle 已拼装；`dag_version` / `spec_fix_plan` 已更新
 - [ ] must-fix 均有改法并已进 fix-spec（或用户豁免）
 - [ ] spec_deviations 已闭合或用户确认

@@ -38,7 +38,7 @@ disable-model-invocation: true
 
 ### 上游探索 ≠ 跳过 impl
 
-无论探索结论来自何处，**都须真正落地 impl**（写代码），不能只探索不实现；至于是派子代理还是按 §trivial 豁免由主代理直接执行，看节点是否满足豁免条件。探索摘要仅用于 Context Bundle，使 prompt 更清晰。
+无论探索结论来自何处，**都须真正落地 impl**（写代码），不能只探索不实现；至于是派子代理还是按 §轻量直改由主代理直接执行，看节点是否满足直改条件。探索摘要仅用于 Context Bundle，使 prompt 更清晰。
 
 ---
 
@@ -55,23 +55,15 @@ disable-model-invocation: true
 - **失败**：重试一次 → 仍失败则 not-ready，主代理改 DAG 或标注 blocked
 - **同文件禁止** 并行 impl/fix
 
-### trivial 豁免（主代理直接执行）
+### 轻量直改（主代理直接执行）
 
-一个节点既不需要上下文隔离、又不需要并行时，它就是 trivial 的——派子代理的两个价值都不沾，那就没必要付往返开销，主代理直接干掉。
-
-派遣子代理的核心价值是**上下文隔离**和**并行**。当一个节点两者都不需要——主代理直接执行也不会消耗多少上下文、又没有可并发的兄弟节点——那就没必要付子代理往返的固定开销，主代理自己干掉。
-
-未标 executor 则默认 `executor: subagent`。
+派遣子代理的核心价值是**上下文隔离**和**并行**。节点小而明确时两个价值都不沾，没必要付子代理往返的固定开销，主代理直接干掉。未标 executor 则默认 `executor: subagent`。
 
 **适用节点**：impl、fix、verify。
 
-判据是 **主代理直接执行不会消耗大量上下文**，须同时满足：
+**快路径**（命中即直改，不必细想）：改动集中在 **1–2 个文件**、位置已知（探索或 spec 已指明，无需再读一堆文件搞清现状）、验证输出短（单测 pass/fail 一行就够，而非完整构建日志）。
 
-- 改动位置已知，无需深度探索（不用先读一堆文件搞清楚现状）
-- 预估阅读量小（少数文件、改动集中）
-- 验证输出短（单测 pass/fail 一行就够，而非完整构建日志）
-
-拿不准时，以「预估 ≤3 次工具调用（含读文件、搜索、跑测试等）」作为兜底倾向主代理直接执行。
+**主判据**是 **主代理直接执行不会消耗大量上下文**——快路径只是它的粗代理，拿不准时回到主判据衡量。特别注意**试错预期**：测试可能反复红、要边跑边改多轮的节点，即使文件少也应派遣，因为上下文膨胀发生在试错环节，不在编辑环节。
 
 满足时在 `node_status` 标 `executor: main`，验证与证据留痕照常——省的是子代理往返，不是省质量。
 
@@ -96,7 +88,7 @@ dag_version: 1
 wave_plan: [[impl-a, impl-b], [verify-a, verify-b], [cr-func-ab]]
 node_status:
   impl-a: { status: done, head_sha: abc123, executor: subagent }
-  impl-b: { status: done, executor: main }   # trivial 主代理直接执行
+  impl-b: { status: done, executor: main }   # 轻量直改
   cr-func-ab: { status: done, func_ready: yes }
 open_must_fix: []
 spec_deviations: []  # open 项阻塞 dev-ready
@@ -112,10 +104,10 @@ spec_deviations: []  # open 项阻塞 dev-ready
 
 | 类型 | 执行者 | 说明 |
 |------|--------|------|
-| **impl** | 子代理（trivial 时主代理直接执行） | 强耦合链 → **单 impl 节点**；无冲突可多 impl **同 wave** |
-| **verify** | 子代理（trivial 时主代理直接执行） | 依赖上游 impl/fix；同 wave 可并行 |
-| **cr-func** | readonly 子代理 | 波次内 **功能小检**（§cr-func 检查项） |
-| **fix** | 子代理（trivial 时主代理直接执行） | 闭合 verify/cr-func 的 must-fix |
+| **impl** | 子代理（轻量时主代理直改，§轻量直改） | 强耦合链 → **单 impl 节点**；无冲突可多 impl **同 wave** |
+| **verify** | 子代理（轻量时主代理直改） | 依赖上游 impl/fix；同 wave 可并行 |
+| **cr-func** | readonly 子代理 | 波次内 **功能小检**（§cr-func 检查项）；波次即其检查范围，每波次一个 |
+| **fix** | 子代理（轻量时主代理直改） | 闭合 verify/cr-func 的 must-fix |
 
 典型子图：
 
@@ -145,6 +137,7 @@ spec_summary: ...
 explore_summary: ...    # 若上下文中有
 files_touched_plan: [...]
 contracts: [...]        # API/事件/配置
+evidence_packs: [...]   # 稳定背景证据包路径（见「证据包」）
 head_sha: ...
 blocking_steps: [...]
 dag_version: 1
@@ -166,6 +159,15 @@ dag_version: ...
 wave_plan: [...]
 node_status: { ... }
 ```
+
+### 证据包（evidence pack）
+
+跨波次重复读的**稳定背景**（模块地图、调用链、约定、既往 findings、diff 统计）落盘复用，**生产者写、消费者读**：
+
+- 生产者：第一个读该区域的子代理（上游探索 / 首轮 review / 首个 impl）顺手落盘，路径写入 Bundle 的 `evidence_packs`；主代理只持路径，**不亲自写包**——否则读代码的成本只是转移到了最贵的主代理上下文上
+- 路径：`docs/iterations/<name>/cache/<topic>.md`（过程产物，不入版本控制；用户另指定则从其指定）
+- 失效：包头记 `head_sha` / 生成节点 / 范围；后续节点发现 sha 不一致 → 视为 stale，仅作线索，事实须新鲜读
+- 边界：只放稳定背景；**spec 与被改代码必须新鲜读**，不得以包替代
 
 ---
 
@@ -192,7 +194,7 @@ node_status: { ... }
 ```text
 准备 → Bundle-full → 初始 DAG（含 cr-func 边）
   → loop:
-      取就绪 wave → trivial 节点主代理直接执行，余者并行派子代理 → 同步等待 → 更新 node_status
+      取就绪 wave → 轻量节点主代理直接执行，余者并行派子代理 → 同步等待 → 更新 node_status
       → 全节点 done 且 cr-func 均 func-ready? ─是→ dev-ready
       → not-ready? ─→ 重编排（dag_version++）→ 继续
 ```
@@ -212,7 +214,7 @@ node_status: { ... }
 
 ## Step 2：波次执行
 
-1. 当前 wave 节点分类：trivial 者主代理直接执行（标 `executor: main`），其余 **并行**派子代理
+1. 当前 wave 节点分类：轻量者主代理直接执行（标 `executor: main`，判据见 §轻量直改），其余 **并行**派子代理
 2. **同步等待**
 3. 任一 fail / cr-func not func-ready → **not-ready**
 
@@ -313,7 +315,7 @@ spec_deviations: []
 - [ ] 用户已确认 spec（记忆文件或 Bundle 可沿用）
 - [ ] 初始 DAG **含 cr-func 节点与边**，且状态在 Bundle / iteration-state（非记忆文件）
 - [ ] 无冲突节点已尝试 **wave 并行**
-- [ ] trivial 节点已由主代理直接执行并标 `executor: main`（验证仍照常执行）
+- [ ] 轻量节点已由主代理直接执行并标 `executor: main`（验证仍照常执行）
 - [ ] not-ready 已 **重编排**（dag_version 递增）
 - [ ] fix 后已重跑 verify + cr-func
 - [ ] 阶段推进已按 `apm-usage` 记忆语义更新记忆
